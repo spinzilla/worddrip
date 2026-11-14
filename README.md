@@ -70,6 +70,22 @@ node dev/build-android.mjs   # 安卓 debug 包
 3. 调度脚本把卡派给不同的编程 agent（Claude、Codex、Kimi、DeepSeek 等），**实现者和验收者必须是不同的 agent**，验收者照着验收标准复跑、截图，不通过就返工；
 4. 每张卡的结束报告、验收记录、返工原因都留在卡片里，进度记在 [`docs/ledger.md`](docs/ledger.md)。
 
+### 参与开发的模型
+
+截至 0.10.0，一共做了 77 张任务卡。下表的卡数按 [`docs/ledger.md`](docs/ledger.md) 的派工记录统计：一张卡返工时换了人，两边各算一次，所以只是大概数字。
+
+| 模型 | 通过什么工具调用 | 主要做什么 | 实现（张） | 验收（张） |
+|---|---|---|---|---|
+| **Claude Opus 5.5**（Anthropic） | Claude Code | 统筹：和作者对话、定方案、拆卡、复核每一批结果、发版；也写过架构和界面难卡 | 约 12 | — |
+| **Claude Sonnet 5.5**（Anthropic） | Claude Code | 界面和跨文件的难卡（手机版、同步、录入笔记、应用内更新等），以及要细心的验收 | 约 20 | 约 19 |
+| **Claude Haiku 5.5**（Anthropic） | Claude Code | 范围清楚的中小卡 | 约 5 | 约 2 |
+| **Kimi K3.1 Pro**（Moonshot AI） | Codex CLI、DeepSeek Harness | 早期的体力活主力：词库解析、导入导出、教练模块等 | 约 26 | 约 6 |
+| **GPT-6 Luna**（OpenAI） | opencode | 中小卡实现：同步服务器端、发版流水线、实测脚本等 | 约 8 | — |
+| **DeepSeek V4.1 Flash**（DeepSeek） | opencode、DeepSeek Harness | 后期的验收主力：照验收标准复跑、截图、找问题 | 约 4 | 约 44 |
+| **GPT-6 Astra / GPT-6.1 Sol**（OpenAI） | Codex CLI | 早期少量交叉验收 | — | 各 1 |
+
+每张卡由谁实现、谁验收，返工了几次，都写在卡片开头和末尾的验收记录里。
+
 所有 agent 共用的规则在 [`AGENTS.md`](AGENTS.md)，技术方案和每次拍板记录在 [`docs/architecture-draft.md`](docs/architecture-draft.md)。如果你对「多 agent 协作写一个真实应用」感兴趣，任务卡里的验收记录大概是最有意思的部分——包括 agent 们犯过的各种错。
 
 ## 目录

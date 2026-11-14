@@ -29,3 +29,17 @@
   - `localStorage['worddrip.update.dryRun'] = '1'`：电脑下载并校验完就停在「安装前」，不安装不重启。注意：电脑端这只证明「下载+验签通过」，`update.install()` 本身没有被替身记录；手机端没有原生桥时安装调用会记到 `window.__wdInstallCalls`。
 - **手机取消安装**：系统安装确认点「取消」回到应用后，提示条从「正在安装」退回「安装失败」并带重试（不重新下载）。已发现新版后，每 6 小时的检查只刷新界面，让「稍后」到期的提示条回来。
 - **复跑脚本**：`node app/dev/release.mjs bump 0.9.99` → `build --allow-dirty` 打出测试版 → `bump 0.9.2` 还原；然后 `cd app && node dev/e2e/update-077.mjs 0.9.99`（电脑真实窗口）、`node dev/e2e/update-077-mobile.mjs 0.9.99`（390×844 手机 UA，需要已装好的 Playwright 缓存 `~/.cache/linguaclip-e2e`）。静态服务器是 `app/dev/update-server.mjs`。
+
+## 公开仓库（2026-11-14 起）
+
+- 本仓库 `spinzilla/english-studio` **保持私有**，保留完整开发历史。
+- 公开版是 `spinzilla/worddrip`，历史从一个干净快照开始，本地工作副本在 `D:\tmp\worddrip-public`。
+- 公开版里**不放** `docs/coach-rules/`：那里有个人学习者画像，还有从 Academic Phrasebank、eapfoundation 逐字抓取的第三方表格（版权归对方）。
+
+每次发版后同步公开版：
+
+1. 删掉公开副本里除 `.git` 以外的所有文件。
+2. 用 `git archive HEAD` 把本仓库的当前内容解压进去。
+3. 删掉 `docs/coach-rules/`。
+4. `git add -A`，写提交信息「同步到 <版本>」，再 `git push`。
+5. 推送前搜一遍密钥值和个人信息，只报「有/没有」。
