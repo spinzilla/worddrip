@@ -1,0 +1,48 @@
+{
+  "name": "视频app",
+  "private": true,
+  "version": "0.10.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:mobile": "vite build --config vite.mobile.config.ts",
+    "dev:mobile": "vite --config vite.mobile.config.ts",
+    "check": "node scripts/check.mjs",
+    "release": "tauri build --bundles app",
+    "postrelease": "bash scripts/install-macos.sh",
+    "release:public": "bash scripts/release-mac.sh",
+    "build:android": "node dev/build-android.mjs"
+  },
+  "dependencies": {
+    "@fontsource/instrument-sans": "^5.3.0",
+    "@fontsource/source-serif-4": "^5.3.0",
+    "@noble/ed25519": "^3.2.0",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-fs": "^2.5.2",
+    "@tauri-apps/plugin-http": "^2.6.1",
+    "@tauri-apps/plugin-opener": "^2.5.5",
+    "@tauri-apps/plugin-process": "~2.3.1",
+    "@tauri-apps/plugin-updater": "~2.12.0",
+    "kuromoji": "^0.1.2",
+    "lucide-react": "^0.554.0",
+    "pdfjs-dist": "6.5.438",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "ts-fsrs": "^5.4.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.5",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

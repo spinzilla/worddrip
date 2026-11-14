@@ -1,0 +1,16 @@
+{
+  "identifier": "desktop",
+  "description": "电脑专用进程权限",
+  "platforms": [
+    "windows",
+    "macOS",
+    "linux"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "process:allow-restart",
+    "updater:default"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "upgrades": [
+    {
+      "id": "up:be made up of#1", "ord": 1, "line": 4,
+      "raw": "| be made up of | **comprise**（不接 of）/ consist of | comprise: ... |",
+      "plain": "be made up of",
+      "upgrade": "**comprise**（不接 of）/ consist of / be composed of",
+      "source": "AWL SL7", "note": "9.18 期",
+      "examples": [
+        { "seq": 1, "cand": "comprise", "sentence": "The committee comprises five departments.", "ai": true },
+        { "seq": 2, "cand": "consist of", "sentence": "The committee consists of five departments.", "ai": true },
+        { "seq": 3, "cand": "be composed of", "sentence": "The committee is composed of five departments.", "ai": false }
+      ]
+    },
+    {
+      "id": "up:html#1", "ord": 2, "line": 5,
+      "raw": "| <b>bold</b> | <script>alert(1)</script> | x |",
+      "plain": "<b>bold</b> tag",
+      "upgrade": "<script>alert(1)</script>",
+      "source": "作文实战", "note": "含标记的普通文本",
+      "examples": [ { "seq": 1, "cand": "<i>x</i>", "sentence": "Use <u>underline</u> carefully.", "ai": false } ]
+    },
+    {
+      "id": "up:noex#1", "ord": 3, "line": 6,
+      "raw": "| exact and clear | precise | no split |",
+      "plain": "exact and clear", "upgrade": "precise", "source": "AWL SL5", "note": "",
+      "examples": []
+    }
+  ],
+  "selfChecks": [
+    { "id": "sc:1", "ord": 1, "line": 9, "raw": "- concise ↔ verbose", "text": "concise（简明）↔ verbose（啰嗦）：改稿时删 verbose expression" }
+  ],
+  "reviewWords": [
+    { "id": "rv:hook@8.25#1", "ord": 1, "line": 5, "raw": "| hook | ...", "word": "hook", "issue": "8.25", "addedAt": "2026-10-14", "status": "🌱待考察", "level": null, "due": "", "note": "钩 → 钓住 → 吸引（9.22 复现新义）", "source": "Hermes 词库", "verificationStatus": "未查证" },
+    { "id": "rv:shatter@9.24#1", "ord": 2, "line": 7, "raw": "| shatter | ...", "word": "shatter", "issue": "9.24", "addedAt": "2026-10-14", "status": "🌱待考察", "level": null, "due": "", "note": "粉碎；破灭", "source": "课堂笔记", "verificationStatus": "词典或ACL已查" },
+    { "id": "rv:shatter@10.20#1", "ord": 3, "line": 8, "raw": "| shatter | ...", "word": "shatter", "issue": "10.20", "addedAt": "2026-10-22", "status": "🌱待考察", "level": null, "due": "", "note": "粉碎；抽象", "source": "老师划的重点", "verificationStatus": "老师确认" },
+    { "id": "rv:agenda@9.18#1", "ord": 4, "line": 9, "raw": "| agenda | ...", "word": "agenda", "issue": "9.18", "addedAt": "2026-10-04", "status": "L4", "level": 4, "due": "2026-11-11", "note": "9.18 期；多方主体用复数；2026-10-26 复习复数 agendas 对，升 L4", "source": "Hermes 词库", "verificationStatus": "未查证" }
+  ]
+}

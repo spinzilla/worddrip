@@ -1,0 +1,3 @@
+docs/ledger.md merge=union
+app/dev/fixtures/vocab/**/*.md text eol=lf
+app/src-tauri/Cargo.toml text eol=lf

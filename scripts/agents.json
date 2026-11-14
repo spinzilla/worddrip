@@ -1,0 +1,15 @@
+{
+  "说明": "调度脚本和 agent-board 看板共用的执行者名单。默认名单在同级目录 ../agent-board/scripts/agents.json，改那边时同步这里。dsh 的 patch 相对本仓库根目录解析（文件在同级的 agent-board 里）。kind 可以是 codex / dsh / claude / opencode。任务卡「实现」「验收」只能填这里的名字，或 claude（不带后缀，表示不进脚本，由 Claude 主会话亲自做）。down 字段非空表示暂时不可用，脚本不会派活给它。",
+  "agents": {
+    "codex-luna": { "kind": "codex", "model": "gpt-6-luna", "label": "gpt-6-luna", "role": "体力活：范围清楚的小卡", "down": "GPT 额度用完（2026-11-06），恢复后删掉本字段" },
+    "codex-astra": { "kind": "codex", "model": "gpt-6-astra", "label": "gpt-6-astra", "role": "难卡、交叉验收、拆卡与复核", "down": "GPT 额度用完（2026-11-06），恢复后删掉本字段" },
+    "codex-56-sol": { "kind": "codex", "model": "gpt-5.6-sol", "label": "gpt-5.6-sol", "role": "代码实现与验收（用户指定型号）", "down": "GPT 额度用完（2026-11-06），恢复后删掉本字段" },
+    "codex-61-sol": { "kind": "codex", "model": "gpt-6.1-sol", "label": "gpt-6.1-sol", "role": "代码实现与验收（用户指定型号）", "down": "GPT 额度用完（2026-11-06），恢复后删掉本字段" },
+    "opencode-ds-flash": { "kind": "opencode", "model": "opencode-go/deepseek-v4.1-flash", "label": "DeepSeek v4.1 Flash（opencode）", "role": "体力活、简单验收（便宜、快）" },
+    "opencode-luna": { "kind": "opencode", "model": "opencode-go/gpt-6-luna", "label": "GPT 6 Luna（opencode）", "role": "范围清楚的中小卡实现（2026-11-11：小卡 052、059 和中等卡 058 都一次通过；058 自己查清耗时、做了测试门闩，质量不错（只一张中等卡的样本），但慢，约 50 分钟）" },
+    "codex-k3": { "kind": "codex", "model": "ccs-kimi-2/k3.1-pro", "label": "Kimi K3.1 Pro", "role": "体力活主力（实现）。不要派验收：2026-11-10 两次验收开头就交结论、什么都没跑（经 Codex 调用）" },
+    "claude-opus": { "kind": "claude", "model": "opus", "effort": "high", "label": "Claude Opus 5.5", "role": "统筹复核、架构和界面难卡（最贵，额度够时用）" },
+    "claude-sonnet": { "kind": "claude", "model": "sonnet", "label": "Claude Sonnet 5.5", "role": "难卡、跨文件改动、要细心的验收（较贵）" },
+    "claude-haiku": { "kind": "claude", "model": "haiku", "label": "Claude Haiku 5.5", "role": "范围清楚的中小卡实现（用户 2026-11-11：能力和 K3.1 相近、实际更便宜，多派；051、053 一次通过，053 根因已写在卡里，实际只改一行，约 5 分钟 $0.03）；小改动、照清单复跑的验收", "fallback": { "impl": "codex-k3", "review": "opencode-ds-flash" } }
+  }
+}

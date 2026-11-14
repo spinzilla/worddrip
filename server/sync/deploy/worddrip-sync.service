@@ -1,0 +1,21 @@
+[Unit]
+Description=WordDrip Sync API
+After=network.target
+
+[Service]
+Type=simple
+User=worddrip
+Group=worddrip
+WorkingDirectory=/opt/worddrip-sync/app
+EnvironmentFile=/etc/worddrip-sync.env
+ExecStart=/opt/worddrip-sync/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8710
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/worddrip-sync/data
+
+[Install]
+WantedBy=multi-user.target

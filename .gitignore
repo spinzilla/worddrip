@@ -1,0 +1,40 @@
+# 密钥
+.env
+.env.*
+!.env.example
+*.key
+
+# 依赖与构建产物
+node_modules/
+dist/
+target/
+app/src-tauri/gen/android/app/build/
+app/src-tauri/gen/android/.gradle/
+app/src-tauri/gen/android/build/
+app/src-tauri/gen/android/local.properties
+app/src-tauri/gen/android/app/src/main/jniLibs/
+app/src-tauri/gen/android/app/src/main/assets/
+*.apk
+*.aab
+
+# whisper 模型与媒体（太大，不进仓库）
+*.bin
+*.gguf
+*.mp4
+*.mkv
+*.mp3
+
+# 本地数据库
+*.db
+*.db-*
+*.sqlite
+server/sync/**/*.db*
+server/sync/.venv/
+__pycache__/
+
+# 调度脚本日志（scripts/dispatch.mjs）
+.dispatch/
+
+# 系统杂项
+.DS_Store
+Thumbs.db

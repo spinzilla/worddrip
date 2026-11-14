@@ -1,0 +1,174 @@
+/**
+ * Checks the review decks' scheduling and matching in utils/review.ts.
+ * Run with: node test-review.mjs
+ *
+ * Bundles the real module (same as the other test-*.mjs) so this fails when
+ * that file drifts. The IndexedDB layer isn't exercised here; the browser run is.
+ */
+import { build } from 'esbuild';
+import assert from 'node:assert/strict';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const loadFile = (p) => import(pathToFileURL(p).href);
+
+const out = join(tmpdir(), `review-${process.pid}.mjs`);
+await build({ entryPoints: ['utils/review.ts'], bundle: true, format: 'esm', outfile: out });
+const R = await loadFile(out);
+
+const DAY = 86400000;
+const now = Date.parse('2026-09-24T10:00:00Z');
+const base = { id: 'v1|1.00', deck: 'line', videoId: 'v1', videoName: 'a.mp4', text: 'Hello there, friend.', start: 1, end: 3 };
+
+// Grades come from the dictation, never from the learner.
+assert.equal(R.gradeOf({ correct: false, helped: false }), 1); // Again
+assert.equal(R.gradeOf({ correct: false, helped: true }), 1);
+assert.equal(R.gradeOf({ correct: true, helped: true }), 2);   // Hard
+assert.equal(R.gradeOf({ correct: true, helped: false }), 3);  // Good
+
+// A new card is due at once; no minute steps, so every answer pushes it to another day.
+const fresh = R.newCard(base, 'wrong', now);
+assert.ok(R.isDue(fresh, now));
+for (const o of [{ correct: false, helped: false }, { correct: true, helped: true }, { correct: true, helped: false }]) {
+  const next = R.schedule(fresh, o, now);
+  assert.ok(next.fsrs.due >= now + DAY * 0.9, `answer ${JSON.stringify(o)} is due again the same day`);
+  assert.ok(!R.isDue(next, now + 60000));
+  assert.equal(next.fsrs.reps, 1);
+}
+// Getting it right grows the gap; getting it wrong again shrinks it back.
+let c = fresh, t = now;
+const gaps = [];
+for (let i = 0; i < 4; i++) { c = R.schedule(c, { correct: true, helped: false }, t); gaps.push(c.fsrs.due - t); t = c.fsrs.due; }
+assert.ok(gaps[3] > gaps[0] * 3, `gaps don't grow: ${gaps.map(g => (g / DAY).toFixed(1))}`);
+const lapsed = R.schedule(c, { correct: false, helped: false }, t);
+assert.ok(lapsed.fsrs.due - t < gaps[3], 'a miss should come back sooner');
+assert.equal(lapsed.fsrs.lapses, 1);
+
+// The four buttons: the day shown under each is the day kept, fuzz and all.
+for (const card of [fresh, c, lapsed]) {
+  const at = t + 12345;
+  const shown = R.previewDue(card, at);
+  for (const g of [1, 2, 3, 4]) assert.equal(R.schedule(card, g, at).fsrs.due, shown[g], `grade ${g} kept a different day than shown`);
+  assert.ok(shown[1] <= shown[2] && shown[2] <= shown[3] && shown[3] <= shown[4], 'harder buttons come back sooner');
+}
+// "Again", then seen once more in the same round: still a whole day off, never "due now".
+const redo = R.schedule(R.schedule(c, 1, t), 3, t + 60000);
+assert.ok(redo.fsrs.due >= t + DAY * 0.9 && redo.fsrs.reps === c.fsrs.reps + 2);
+
+// Stored form round-trips as plain numbers (IndexedDB-safe, no Date objects).
+assert.equal(typeof lapsed.fsrs.due, 'number');
+assert.ok(lapsed.fsrs.last_review === undefined || typeof lapsed.fsrs.last_review === 'number');
+
+// Meeting the card again only adds a reason; the schedule stays.
+const again = R.withReason(lapsed, 'peek');
+assert.deepEqual(again.reasons, ['wrong', 'peek']);
+assert.equal(again.fsrs.due, lapsed.fsrs.due);
+assert.equal(R.withReason(again, 'peek').reasons.length, 2);
+assert.equal(R.withReason(again, 'saved').saved, true);
+
+// Queue: this deck only, due only, has audio, oldest first, capped.
+const mk = (id, deck, due, start = 1) => ({ ...R.newCard({ ...base, id, deck, start }, 'wrong', now), fsrs: { ...fresh.fsrs, due } });
+const cards = [
+  mk('b', 'line', now - 10), mk('a', 'line', now - 20), mk('future', 'line', now + DAY),
+  mk('w', 'word', now - 30), mk('mute', 'line', now - 40, -1),
+  ...Array.from({ length: 20 }, (_, i) => mk(`n${i}`, 'line', now - 1)),
+];
+const q = R.dueQueue(cards, 'line', now);
+assert.equal(q.length, R.SESSION_SIZE);
+assert.deepEqual(q.slice(0, 2).map(x => x.id), ['a', 'b']);
+assert.ok(!q.some(x => x.id === 'future' || x.id === 'w' || x.id === 'mute'));
+assert.deepEqual(R.deckCounts(cards, now), { line: { due: 22, total: 24, remembered: 0 }, word: { due: 1, total: 1, remembered: 0 } });
+
+// Left without a grade (skipped / quit): next round puts it after the other due cards, earliest-left first (docs/review.md).
+const many = Array.from({ length: 18 }, (_, i) => mk(`d${i}`, 'line', now - 100 + i));
+const oldOrder = many.map(x => x.id).slice(0, R.SESSION_SIZE);
+assert.deepEqual(R.dueQueue(many, 'line', now, R.SESSION_SIZE, {}).map(x => x.id), oldOrder, 'empty table: order unchanged');
+const later = R.dueQueue(many, 'line', now, many.length, { d0: now - 50, d1: now - 60, d2: now - 40 }).map(x => x.id);
+assert.deepEqual(later.slice(0, 15), many.slice(3).map(x => x.id), 'deferred cards should come after the rest');
+assert.deepEqual(later.slice(15), ['d1', 'd0', 'd2']);
+assert.ok(!R.dueQueue(many, 'line', now, R.SESSION_SIZE, { d0: 1, d1: 2, d2: 3 }).some(x => ['d0', 'd1', 'd2'].includes(x.id)));
+// Graded after it was left: the old entry no longer counts.
+const graded = many.map(x => x.id === 'd0' ? { ...x, fsrs: { ...x.fsrs, last_review: now - 10 } } : x);
+assert.equal(R.dueQueue(graded, 'line', now, R.SESSION_SIZE, { d0: now - 50 })[0].id, 'd0');
+// Default table from localStorage: none (node), broken JSON, or a real entry.
+assert.deepEqual(R.dueQueue(many, 'line', now).map(x => x.id), oldOrder);
+const store = new Map();
+globalThis.localStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+store.set('linguaclip_review_deferred', '{bad');
+assert.deepEqual(R.dueQueue(many, 'line', now).map(x => x.id), oldOrder, 'broken JSON: old order');
+store.set('linguaclip_review_deferred', JSON.stringify({ d0: now }));
+assert.equal(R.dueQueue(many, 'line', now)[0].id, 'd1');
+delete globalThis.localStorage;
+
+// Ids: one sentence card per video line; word cards hang off it.
+assert.equal(R.lineCardId('v1', 12.3), 'v1|12.30');
+assert.equal(R.wordCardId('v1', 12.3, 'Friend'), 'v1|12.30|w|friend');
+
+// Which word to blank.
+assert.equal(R.wordIndexIn(['Hello', 'there,', 'friend.'], 'friend'), 2);
+assert.equal(R.wordIndexIn(['I', "don't", 'know'], "Don't"), 1);
+// Japanese: a word kept under another split still finds its box; English does not guess.
+assert.equal(R.wordIndexIn(['今日は', 'いい', '天気ですね'], '天気'), 2);
+assert.equal(R.wordIndexIn(['今日は', 'いい天気', 'ですね'], '天気ですね'), 1);
+assert.equal(R.wordIndexIn(['Hello', 'there'], 'the'), 0);
+assert.deepEqual(R.wordBoxes(['今日は', 'いい天気', 'ですね'], '天気ですね'), [1, 2]);
+assert.deepEqual(R.wordBoxes(['今日は', 'いい', '天気ですね'], '今日はいい天気ですね'), [0, 1, 2], 'an older whole-line card blanks the whole line');
+assert.deepEqual(R.wordBoxes(['Hello', 'there,', 'friend.'], 'friend'), [2]);
+
+// Old bookmarks find their line by file name + text, nearest mm:ss wins.
+const srt = '1\n00:00:01,000 --> 00:00:02,000\nYeah.\n\n2\n00:01:05,000 --> 00:01:07,500\nYeah.\n\n3\n00:01:10,000 --> 00:01:12,000\nOther line.\n';
+const records = [
+  { id: 'r1', videoFileName: 'a.mp4', displayName: 'a', videoPath: '/v/a.mp4', subtitleText: srt },
+  { id: 'r2', videoFileName: 'b.mp4', displayName: 'b', subtitleText: srt },
+];
+const hit = R.matchLegacy({ text: 'Yeah.', videoName: 'a.mp4', timeDisplay: '01:04' }, records);
+assert.equal(hit.record.id, 'r1');
+assert.equal(hit.start, 65);
+assert.equal(hit.end, 67.5);
+assert.equal(R.matchLegacy({ text: 'Yeah.', videoName: 'gone.mp4', timeDisplay: '00:01' }, records), null);
+assert.equal(R.matchLegacy({ text: 'Nope.', videoName: 'a.mp4', timeDisplay: '00:01' }, records), null);
+
+// "Remembered" on the home screen: a line stable for a week or more; words and silent lines never count.
+const stable = { ...fresh, fsrs: { ...fresh.fsrs, stability: R.REMEMBERED_DAYS } };
+assert.ok(R.isRemembered(stable));
+assert.ok(!R.isRemembered({ ...stable, fsrs: { ...stable.fsrs, stability: R.REMEMBERED_DAYS - 0.1 } }));
+assert.ok(!R.isRemembered({ ...stable, deck: 'word' }));
+assert.ok(!R.isRemembered({ ...stable, start: -1 }));
+assert.ok(!R.isRemembered(fresh));
+assert.equal(R.deckCounts([stable, fresh], now).line.remembered, 1);
+
+// "Got it": out of review, counts as remembered; getting stuck again takes it off, bookmarking doesn't.
+const got = { ...fresh, mastered: now };
+assert.ok(!R.isDue(got, now + DAY * 365));
+assert.ok(R.isRemembered(got));
+assert.equal(R.deckCounts([got], now).line.due, 0);
+for (const r of ['wrong', 'peek', 'breakdown', 'blur', 'missed']) assert.ok(!('mastered' in R.withReason(got, r)), `${r} keeps "got it"`);
+assert.equal(R.withReason(got, 'saved').mastered, now);
+assert.ok(R.isDue(R.withReason(got, 'wrong'), now));
+
+// Language decks (utils/deckLang.ts): a card's language is its video's — set by hand,
+// else guessed from the whole subtitle file; orphans by their siblings' lines.
+const outL = join(tmpdir(), `decklang-${process.pid}.mjs`);
+await build({ entryPoints: ['utils/deckLang.ts'], bundle: true, format: 'esm', outfile: outL });
+const L = await loadFile(outL);
+const toSrt = lines => lines.map((t, i) => `${i + 1}\n00:00:0${i},000 --> 00:00:0${i},900\n${t}\n`).join('\n');
+const esSrt = toSrt(['¿Qué es lo que quieres?', 'Yo no sé por qué está aquí.', 'Pero la casa es muy grande.']);
+const jaSrt = toSrt(['今日はいい天気ですね。', 'それはちょっと難しいかもしれない。']);
+const card = (id, videoId, text) => ({ ...base, id, videoId, text });
+const langs = L.cardLangs([
+  card('a', 'es1', 'Hola'),
+  card('b', 'ja1', 'はい'),
+  card('c', 'fixed', 'the cat'),              // guessed Spanish, set to English by hand
+  card('d', 'zh', '你好'),                     // no dictionary language → Unsorted
+  card('e', 'gone', 'Yo no sé qué es esto.'), // video deleted: judged by its siblings together
+  card('f', 'gone', 'Pero la casa es muy grande.'),
+  card('g', '', 'これは古いブックマークです'),     // old bookmark with no video: its own line
+], [
+  { id: 'es1', subtitleText: esSrt }, { id: 'ja1', subtitleText: jaSrt },
+  { id: 'fixed', subtitleText: esSrt, lang: 'en' }, { id: 'zh', subtitleText: toSrt(['你好，我是小明。']) },
+]);
+assert.deepEqual(Object.fromEntries(langs), { a: 'es', b: 'ja', c: 'en', d: 'other', e: 'es', f: 'es', g: 'ja' });
+// Unreadable / empty subtitles are Unsorted, never a crash.
+assert.equal(L.videoLang({ id: 'x' }), 'other');
+
+console.log('test-review: all passed');

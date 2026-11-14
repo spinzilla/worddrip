@@ -1,0 +1,364 @@
+/* 仅作用于词库页：长词、长备注强制换行，窄屏不横向溢出。 */
+.vocab-wrap { overflow-wrap: anywhere; word-break: break-word; }
+
+/* 029 查词：桌面左列表右详情；窄屏只显示一个，点开详情后列表隐藏，有「返回列表」。 */
+.vocab-browse { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.vocab-back { display: inline-flex; }
+@media (max-width: 899px) {
+  .vocab-browse[data-has-detail="true"] .vocab-list-col { display: none; }
+  .vocab-browse[data-has-detail="false"] .vocab-detail-col { display: none; }
+  .vocab-hint { display: none; }
+}
+@media (min-width: 900px) {
+  .vocab-browse { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; }
+  .vocab-back { display: none; }
+  .vocab-list { max-height: 70vh; overflow-y: auto; padding-right: 2px; }
+  .vocab-detail-col { position: sticky; top: 0.5rem; max-height: calc(100vh - 1rem); overflow-y: auto; border: 1px solid var(--line); border-radius: 1rem; padding: 1.25rem; }
+}
+
+.vocab-search:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgb(var(--c-ink) / 0.06); }
+.vocab-search::-webkit-search-cancel-button { display: none; }
+
+.vocab-filters { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
+.vocab-filter { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; font-size: 0.75rem; color: var(--mute); }
+.vocab-filter select { min-width: 0; max-width: 11rem; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--page); padding: 0.3rem 0.5rem; font-size: 0.8125rem; color: var(--ink); }
+
+.vocab-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.vocab-row {
+  display: block; width: 100%; text-align: left; min-width: 0;
+  border: 1px solid var(--line); border-radius: 0.875rem; background: var(--page); padding: 0.7rem 0.85rem;
+}
+.vocab-row:hover { border-color: rgb(var(--c-ink) / 0.3); }
+.vocab-row[aria-current="true"] { border-color: var(--ink); background: var(--shade); box-shadow: inset 3px 0 0 var(--ink); }
+.vocab-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.vocab-chip {
+  display: inline-flex; align-items: center; flex-shrink: 0; white-space: nowrap;
+  border-width: 1px; border-style: solid; border-radius: 9999px; padding: 0.05rem 0.5rem;
+  font-size: 0.6875rem; line-height: 1.25rem;
+}
+.vocab-mark { background: var(--clay-soft); color: inherit; border-radius: 0.2rem; padding: 0 0.05rem; }
+
+.vocab-issue { border: 1px solid var(--line); border-radius: 0.875rem; background: var(--page); }
+.vocab-issue-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.6rem; padding: 0.7rem 0.85rem; cursor: pointer; list-style: none; }
+.vocab-issue-head::-webkit-details-marker { display: none; }
+.vocab-issue-head::before { content: '▸'; color: var(--mute); font-size: 0.75rem; }
+.vocab-issue[open] > .vocab-issue-head::before { content: '▾'; }
+.vocab-issue-counts { flex-basis: 100%; padding-left: 1rem; }
+.vocab-issue-words { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.4rem; padding: 0 0.6rem 0.6rem; }
+
+/* 详情：词头大、分节清楚；例句完整显示，不截断。 */
+.vocab-headword { font-family: "Source Serif 4", "PingFang SC", Georgia, serif; font-size: 1.85rem; line-height: 1.2; font-weight: 600; color: var(--ink); }
+/* 066 词头区：极淡的强调色底圆角块，和下面的内容分开。 */
+.vocab-hero { border: 1px solid rgb(var(--c-accent) / 0.14); border-radius: 1rem; background: rgb(var(--c-accent-soft) / 0.6); padding: 1rem 1rem 0.85rem; }
+/* 节：统一间距；main = 最重要的「意思」，白卡片 + 浅阴影；其余只在上面画一条细线。 */
+.vocab-section { margin-top: 1.25rem; }
+.vocab-section[data-tone="main"] { border: 1px solid var(--line); border-radius: 1rem; background: var(--page); padding: 0.9rem 1rem 1rem; box-shadow: 0 1px 3px rgb(var(--c-shadow) / 0.08); }
+.vocab-section[data-tone="light"] { border-top: 1px solid var(--line); padding-top: 1rem; }
+.vocab-section-title { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.6rem; font-size: 0.875rem; font-weight: 700; color: var(--ink); }
+.vocab-section-title > svg { color: var(--accent); }
+.vocab-section[data-tone="main"] > .vocab-section-title { color: var(--accent); }
+.vocab-sense + .vocab-sense { border-top: 1px dashed var(--line); padding-top: 1rem; }
+.vocab-example { border-left: 3px solid rgb(var(--c-accent) / 0.55); padding: 0.15rem 0 0.15rem 0.75rem; }
+/* 空状态：一行短话 + 图标；「？」展开的说明独占下一行（flex-wrap + 说明 basis 100%），标题不换行。 */
+.vocab-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; min-width: 0; font-size: 0.875rem; color: var(--mute); }
+/* 用法对照：候选词小胶囊，当前词高亮；首选是胶囊里的小标记。 */
+.vocab-pill { display: inline-flex; align-items: center; gap: 0.35rem; max-width: 100%; border: 1px solid var(--line); border-radius: 9999px; background: var(--page); padding: 0.15rem 0.7rem; font-size: 0.875rem; color: var(--ink); }
+.vocab-pill-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.vocab-pill-tag { border-radius: 9999px; background: var(--clay-soft); padding: 0 0.4rem; font-size: 0.6875rem; line-height: 1.1rem; color: var(--clay); font-weight: 500; white-space: nowrap; }
+/* 学习进度：L1–L5 五个点。 */
+.vocab-dot { width: 0.6rem; height: 0.6rem; border-radius: 9999px; background: var(--shade); border: 1px solid var(--line); }
+.vocab-dot[data-on="true"] { background: var(--accent); border-color: var(--accent); }
+.vocab-bullets { list-style: disc; padding-left: 1.2rem; font-size: 0.875rem; color: var(--ink); }
+.vocab-bullets > li + li { margin-top: 0.25rem; }
+/* 040 我的笔记：一条一张浅卡片；输入框占满宽度、只能竖向拉伸，窄屏不横向溢出。 */
+.vocab-note { border: 1px solid var(--line); border-radius: 0.75rem; background: var(--page); padding: 0.6rem 0.75rem; min-width: 0; }
+/* 例句（我的例句）：左边一条强调色竖线。必须写在 .vocab-note 之后（它的 border 简写会整条盖掉左边框）。 */
+.vocab-note.vocab-note-example { border-left: 3px solid rgb(var(--c-accent) / 0.55); }
+.vocab-note-input { display: block; width: 100%; min-width: 0; max-width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 0.6rem; background: var(--page); padding: 0.5rem 0.7rem; font-size: 0.9375rem; line-height: 1.6; color: var(--ink); }
+.vocab-note-input::placeholder { color: var(--faint); }
+.vocab-candidate-notes > summary { cursor: pointer; list-style: none; }
+.vocab-candidate-notes > summary::-webkit-details-marker { display: none; }
+@media (max-width: 480px) {
+  .vocab-headword { font-size: 1.5rem; }
+}
+
+.vocab-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* 014 今日到期列表：桌面两列，窄屏一列。 */
+.vocab-due-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
+@media (min-width: 640px) {
+  .vocab-due-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.vocab-due-row { min-width: 0; }
+
+/* 014 翻面闪卡：盖住整个窗口，内容居中，窄屏留 16px 边距。 */
+.vocab-flash-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto; background: var(--paper);
+  padding: 2.5rem 1rem;
+}
+.vocab-recall-overlay { z-index: 80; }
+.vocab-flash-inner { width: 100%; max-width: 40rem; min-width: 0; }
+/* 062 动画舞台：翻面/换卡时盖一张旧卡副本；动画期间裁掉溢出（滑出的卡不露到外面）。 */
+.vocab-flash-stage { position: relative; display: flow-root; }
+.vocab-flash-stage[data-anim] { overflow: clip; }
+.vocab-flash-bar { height: 4px; border-radius: 9999px; background: var(--line); overflow: hidden; }
+.vocab-flash-bar-fill { height: 100%; background: var(--accent); transition: width 0.2s ease; }
+.vocab-flash-card {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; min-height: 16rem; min-width: 0;
+  border: 1px solid var(--line); border-radius: 1.25rem;
+  background: var(--page); padding: 1.5rem; cursor: pointer;
+  box-shadow: 0 1px 3px rgb(var(--c-shadow) / 0.08);
+}
+/* 041：反面内容垂直居中（宽屏卡片很高，内容少时不再上面挤、下面大片空白）。 */
+.vocab-flash-card[data-side="back"], .vocab-flash-card[data-ghost-side="back"] { align-items: center; cursor: default; }
+.vocab-flash-card:hover { border-color: rgb(var(--c-ink) / 0.35); }
+.vocab-flash-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.vocab-flash-word { font-family: "Source Serif 4", "PingFang SC", Georgia, serif; font-size: 2.25rem; line-height: 1.15; font-weight: 600; color: var(--ink); }
+.vocab-flash-front { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-width: 0; }
+.vocab-flash-tip { margin-top: 2rem; font-size: 0.8125rem; color: var(--mute); }
+.vocab-flash-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1.25rem; }
+
+/* 036 闪卡改版：宽屏版心 64rem、卡片占大半个屏高；背面左边释义（衬线大字）、右边状态和备注。 */
+.vocab-flash-wide { max-width: 64rem; }
+.vocab-flash-back { width: 100%; min-width: 0; text-align: left; }
+.vocab-flash-back-word { font-family: "Source Serif 4", "PingFang SC", Georgia, serif; font-size: 1.75rem; line-height: 1.2; font-weight: 600; color: var(--ink); }
+.vocab-flash-back-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; margin-top: 1.25rem; }
+.vocab-flash-defs { margin-top: 0.5rem; }
+.vocab-flash-def + .vocab-flash-def { margin-top: 1rem; border-top: 1px dashed var(--line); padding-top: 1rem; }
+.vocab-flash-def-en { margin-top: 0.25rem; font-family: "Source Serif 4", "PingFang SC", Georgia, serif; font-size: 1.1875rem; line-height: 1.5; font-weight: 500; color: var(--ink); }
+.vocab-flash-def-zh { margin-top: 0.2rem; font-size: 0.9375rem; color: var(--mute); }
+.vocab-flash-example {
+  border-left: 3px solid var(--clay-soft); padding: 0.1rem 0 0.1rem 0.75rem;
+  font-family: "Source Serif 4", "PingFang SC", Georgia, serif; font-style: italic; font-size: 1rem; line-height: 1.55; color: var(--ink);
+}
+.vocab-flash-aside { min-width: 0; border-radius: 1rem; background: var(--paper); padding: 1rem; }
+.vocab-flash-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.vocab-flash-notes { min-width: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--page); padding: 1rem; }
+@media (min-width: 768px) {
+  .vocab-flash-card { padding: 2rem 2.25rem; }
+  .vocab-flash-word { font-size: 3.25rem; }
+  .vocab-flash-back-word { font-size: 2.25rem; }
+}
+/* 宽屏：卡片撑到大半个屏高，正面词更大；背面两栏。 */
+@media (min-width: 1024px) {
+  .vocab-flash-overlay { padding: 2.5rem 2rem; }
+  .vocab-flash-wide .vocab-flash-card { min-height: max(22rem, calc(100vh - 13rem)); padding: 2.5rem 3rem; }
+  .vocab-flash-word { font-size: 4.5rem; }
+  .vocab-flash-back-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 2.5rem; }
+  .vocab-flash-def-en { font-size: 1.375rem; }
+  .vocab-flash-example { font-size: 1.0625rem; }
+}
+@media (max-width: 480px) {
+  .vocab-flash-overlay { padding: 1.25rem 1rem; }
+  .vocab-flash-word { font-size: 2rem; }
+  .vocab-flash-card { padding: 1.1rem; }
+  .vocab-flash-back-word { font-size: 1.5rem; }
+  .vocab-flash-def-en { font-size: 1.0625rem; }
+}
+
+/* 061 手机闪卡：整屏三段——顶部进度/退出、中间卡片（占满剩余高度，背面内容在卡内滚动）、底部操作栏固定不动。
+   用 overlay 的 fixed 高度（原生侧已让 WebView 随键盘变矮），touch-action: pan-y 让横向手势交给左右滑切卡。 */
+.vocab-flash-m { padding: 0; overflow: hidden; align-items: stretch; }
+.vocab-flash-m .vocab-flash-inner { display: flex; flex-direction: column; height: 100%; max-width: none; padding: 0.75rem 1rem 0.5rem; }
+.vocab-flash-m .vocab-flash-stage { flex: 1 1 0; min-height: 0; display: flex; margin-top: 0.75rem; }
+.vocab-flash-m .vocab-flash-card { flex: 1 1 auto; min-height: 0; margin-top: 0; overflow-y: auto; touch-action: pan-y; align-items: flex-start; }
+.vocab-flash-m .vocab-flash-card[data-side="front"], .vocab-flash-m .vocab-flash-card[data-ghost-side="front"] { align-items: center; }
+.vocab-flash-m .vocab-flash-controls { flex-wrap: nowrap; gap: 0.5rem; margin-top: 0.75rem; }
+.vocab-flash-m .vocab-flash-foot { margin-top: 0.5rem; }
+
+/* 061 手机答题页：整页滚动，底部操作条贴底；按钮高度 ≥44px。 */
+.vocab-quiz-m { padding-bottom: 0; scroll-padding-bottom: 5.5rem; }
+.vocab-quiz-m .vocab-quiz-footer { margin-left: -1rem; margin-right: -1rem; padding: 0.6rem 1rem; }
+.vocab-quiz-m .vocab-quiz-footer-note { display: none; }
+.vocab-quiz-m { align-items: stretch; }
+.vocab-quiz-m .vocab-quiz-inner { display: flex; flex-direction: column; min-height: 100%; }
+.vocab-quiz-m .vocab-quiz-inner > .vocab-quiz-footer { margin-top: auto; }
+.vocab-quiz-m .vocab-q button { min-height: 44px; }
+.vocab-quiz-m .vocab-quiz-cta { min-height: 44px; }
+.vocab-quiz-m .vocab-quiz-footer .press { min-height: 44px; }
+.vocab-quiz-m .vocab-quiz-top .press { min-height: 44px; }
+.vocab-quiz-m .vocab-quiz-title { font-size: 1rem; }
+
+/* 030 复习题：语境句里的空格带首字母提示，长提示在 390px 窄屏也能折行。 */
+.vocab-recall-overlay form, .vocab-recall-overlay section, .vocab-recall-overlay article { min-width: 0; }
+
+/* 036 答题界面改版：宽屏用满版心（最宽 76rem），每题左边是题面、右边是作答区；窄屏上下排。
+   视觉层级：英文释义（衬线大字）> 语境句（衬线、浅底块、空格高亮）> 提示/输入 > 次要标签。 */
+.vocab-quiz-inner { max-width: 76rem; }
+.vocab-quiz-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.vocab-quiz-title { font-size: 1.125rem; font-weight: 600; color: var(--ink); }
+.vocab-quiz-guide { margin-top: 1rem; max-width: 62rem; font-size: 0.875rem; line-height: 1.6; color: var(--mute); }
+.vocab-quiz-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
+.vocab-quiz-panel { border: 1px solid var(--line); border-radius: 1.25rem; background: var(--page); padding: 1.25rem; box-shadow: 0 1px 3px rgb(var(--c-shadow) / 0.08); }
+.vocab-quiz-summary-title { font-size: 1.375rem; font-weight: 600; color: var(--ink); }
+.vocab-quiz-h3 { font-size: 0.9375rem; font-weight: 600; color: var(--ink); }
+.vocab-quiz-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; text-align: center; }
+.vocab-quiz-stat { border-radius: 0.9rem; background: var(--paper); padding: 0.9rem 0.5rem; min-width: 0; }
+.vocab-quiz-stat-num { font-size: 1.75rem; line-height: 1.1; font-weight: 600; }
+.vocab-quiz-stat-label { margin-top: 0.3rem; font-size: 0.75rem; color: var(--mute); overflow-wrap: anywhere; }
+/* 底部操作条贴着窗口底边：题多要滚动时，「提交这一屏」一直看得见。 */
+.vocab-quiz-footer {
+  position: sticky; bottom: 0; z-index: 1;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem;
+  margin-top: 1.25rem; padding: 0.85rem 0;
+  border-top: 1px solid var(--line); background: var(--paper);
+}
+.vocab-quiz-footer-note { min-width: 0; flex: 1 1 18rem; font-size: 0.75rem; color: var(--mute); }
+.vocab-quiz-cta { padding: 0.7rem 1.6rem; font-size: 0.9375rem; }
+
+/* 一道题 = 一张卡。左边竖条按状态上色：作答中无色、忘记了/答错砖红、答对绿、待定/出错陶土。 */
+.vocab-q {
+  --q-tone: transparent;
+  position: relative; min-width: 0;
+  border: 1px solid var(--line); border-radius: 1.25rem; background: var(--page);
+  padding: 1.15rem 1.15rem 1.15rem 1.35rem;
+  box-shadow: inset 4px 0 0 var(--q-tone), 0 1px 3px rgb(var(--c-shadow) / 0.08);
+}
+.vocab-q[data-tone="forgot"], .vocab-q[data-tone="wrong"] { --q-tone: var(--danger); }
+.vocab-q[data-tone="correct"] { --q-tone: var(--success); }
+.vocab-q[data-tone="pending"], .vocab-q[data-tone="flagged"] { --q-tone: var(--clay); }
+.vocab-q:focus-within[data-tone="writing"] { border-color: rgb(var(--c-accent) / 0.45); }
+.vocab-q:not(.vocab-q-recheck), .vocab-q-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.vocab-q-span { grid-column: 1 / -1; min-width: 0; }
+.vocab-q-recheck .vocab-q-grid { margin-top: 1rem; }
+.vocab-q-prompt, .vocab-q-answer { min-width: 0; }
+.vocab-q-answer { border-top: 1px dashed var(--line); padding-top: 1rem; }
+
+.vocab-q-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; font-size: 0.8125rem; color: var(--mute); }
+.vocab-q-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 1.75rem; height: 1.75rem; border-radius: 9999px;
+  background: var(--ink); color: var(--page); font-size: 0.8125rem; font-weight: 600;
+}
+.vocab-q-tag { display: inline-flex; align-items: center; border-radius: 9999px; background: var(--shade); padding: 0.1rem 0.55rem; font-size: 0.75rem; color: var(--mute); white-space: nowrap; }
+
+/* 048 例句场景标签：样式同「AI 例句」小标签；选项在例句下面换行展开，不用浮层，窄屏不溢出。 */
+.vocab-scene { display: inline; margin-left: 0.5rem; font-style: normal; font-family: inherit; }
+.vocab-scene-tag { cursor: pointer; border: 1px solid transparent; font-style: normal; }
+.vocab-scene-tag:hover { border-color: var(--line); }
+.vocab-scene-add { cursor: pointer; background: transparent; border: 1px dashed var(--line); opacity: 0.6; font-style: normal; }
+.vocab-scene-add:hover { opacity: 1; }
+.vocab-scene-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; max-width: 100%; font-style: normal; }
+.vocab-scene-option { cursor: pointer; border: 1px solid var(--line); background: var(--page); color: var(--ink); gap: 0.35rem; }
+.vocab-scene-option:hover { border-color: var(--mute); }
+.vocab-scene-option.is-current { background: var(--shade); font-weight: 600; }
+.vocab-scene-option:disabled { opacity: 0.5; cursor: not-allowed; }
+.vocab-scene-zh { color: var(--mute); font-size: 0.6875rem; }
+
+.vocab-q-label { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; color: var(--accent); }
+.vocab-q-pos { font-family: "Source Serif 4", Georgia, serif; font-style: italic; font-weight: 500; letter-spacing: 0; font-size: 0.875rem; color: var(--mute); }
+.vocab-q-meaning { margin-top: 1rem; }
+.vocab-q-meaning-text {
+  margin-top: 0.3rem;
+  font-family: "Source Serif 4", "PingFang SC", Georgia, serif;
+  font-size: 1.25rem; line-height: 1.45; font-weight: 500; color: var(--ink);
+}
+.vocab-q-sentence-box { margin-top: 1rem; border-radius: 0.9rem; background: var(--paper); padding: 0.8rem 1rem 0.9rem; }
+.vocab-q-sentence-box .vocab-q-label { color: var(--mute); }
+.vocab-q-sentence {
+  margin-top: 0.3rem;
+  font-family: "Source Serif 4", "PingFang SC", Georgia, serif;
+  font-size: 1.1875rem; line-height: 1.7; color: var(--ink);
+}
+.vocab-recall-blank {
+  display: inline; padding: 0.05em 0.4em; margin: 0 0.12em;
+  border-bottom: 2px solid var(--accent); border-radius: 0.3em 0.3em 0 0;
+  background: var(--accent-soft); color: var(--accent);
+  font-family: "Instrument Sans", "PingFang SC", system-ui, sans-serif; font-weight: 600;
+  overflow-wrap: anywhere; letter-spacing: 0.12em;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+.vocab-recall-blank-filled { letter-spacing: 0.01em; font-family: inherit; color: var(--ink); }
+.vocab-q-chinese { margin-top: 0.75rem; font-size: 0.875rem; }
+.vocab-q-chinese > summary { cursor: pointer; color: var(--mute); width: fit-content; }
+
+.vocab-q-hint { font-size: 0.875rem; color: var(--ink); overflow-wrap: anywhere; }
+.vocab-q-hint-letters { font-weight: 600; font-size: 1rem; letter-spacing: 0.12em; color: var(--accent); }
+.vocab-q-input-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; margin-top: 0.5rem; }
+.vocab-q-input {
+  display: block; flex: 1 1 11rem; min-width: 0; width: 100%;
+  border: 1.5px solid var(--line); border-radius: 0.9rem; background: var(--page);
+  padding: 0.7rem 0.9rem; font-size: 1.125rem; color: var(--ink); outline: none;
+}
+textarea.vocab-q-input { flex-basis: 100%; font-size: 1rem; line-height: 1.55; }
+.vocab-q-input::placeholder { color: var(--faint); }
+.vocab-q-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.14); }
+.vocab-q-input:read-only { background: var(--paper); }
+.vocab-q-input-forgot { border-style: dashed; color: var(--mute); text-decoration: line-through; }
+.vocab-q-forgot {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; flex: 0 0 auto;
+  border: 1.5px dashed rgb(var(--c-danger) / 0.5); border-radius: 9999px; background: var(--page);
+  padding: 0.55rem 1rem; font-size: 0.875rem; color: var(--danger); white-space: nowrap;
+}
+.vocab-q-forgot:hover:not(:disabled), .vocab-q-forgot-on { background: var(--danger-soft); }
+.vocab-q-forgot-on { border-style: solid; }
+.vocab-q-answer-word { font-family: "Source Serif 4", "PingFang SC", Georgia, serif; font-size: 1.25rem; font-weight: 600; color: var(--ink); }
+
+/* 038 改写/造句：要求用正文字号，原句沿用语境句的衬线大字；造句题的目标词做成醒目的小标签。 */
+.vocab-q-task { margin-top: 0.3rem; font-size: 1rem; line-height: 1.6; color: var(--ink); }
+.vocab-q-target {
+  display: inline-flex; align-items: center; border-radius: 9999px; background: var(--accent-soft); color: var(--accent);
+  padding: 0.1rem 0.6rem; font-family: "Source Serif 4", Georgia, serif; font-size: 0.9375rem; font-weight: 600; letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.vocab-q-fixes { display: grid; gap: 0.4rem; list-style: none; padding: 0; margin-bottom: 0; }
+.vocab-q-fixes > li { display: grid; gap: 0.15rem; border-radius: 0.7rem; background: var(--page); padding: 0.5rem 0.7rem; min-width: 0; }
+.vocab-q-fix-label { font-size: 0.75rem; font-weight: 600; color: var(--mute); }
+
+/* 041 每题工具行：左边「这题出错了」，右边「记一笔 / 笔记（n）」；笔记面板在工具行下面，不挡答案框和「忘记了」。 */
+.vocab-q-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; margin-top: 0.75rem; }
+.vocab-q-note-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem; margin-left: auto;
+  border: 1px solid var(--line); border-radius: 9999px; background: var(--page);
+  padding: 0.3rem 0.75rem; font-size: 0.8125rem; color: var(--ink); white-space: nowrap;
+}
+.vocab-q-note-btn:hover { border-color: rgb(var(--c-ink) / 0.3); }
+.vocab-q-note-btn[aria-expanded="true"] { background: var(--paper); }
+.vocab-q-notes { margin-top: 0.6rem; min-width: 0; border-radius: 0.9rem; background: var(--paper); padding: 0.75rem; }
+
+@media (min-width: 768px) {
+  .vocab-quiz-panel { padding: 1.75rem 2rem; }
+  .vocab-q { padding: 1.5rem 1.75rem 1.5rem 2rem; }
+  .vocab-quiz-title { font-size: 1.375rem; }
+  .vocab-quiz-stat-num { font-size: 2.25rem; }
+  .vocab-quiz-summary-title { font-size: 1.625rem; }
+}
+/* 宽屏（1024px 起）：题面 7 份、作答区 5 份并排；作答区用左侧虚线隔开。 */
+@media (min-width: 1024px) {
+  .vocab-recall-overlay { padding: 2.5rem 2rem; }
+  .vocab-q:not(.vocab-q-recheck), .vocab-q-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 2rem; }
+  .vocab-q-answer { border-top: 0; padding-top: 0.25rem; border-left: 1px dashed var(--line); padding-left: 2rem; }
+  .vocab-q-meaning-text { font-size: 1.5rem; }
+  .vocab-q-sentence { font-size: 1.375rem; }
+  .vocab-q-input { font-size: 1.25rem; padding: 0.8rem 1rem; }
+}
+@media (min-width: 1600px) {
+  .vocab-q-meaning-text { font-size: 1.625rem; }
+  .vocab-q-sentence { font-size: 1.5rem; }
+}
+@media (max-width: 480px) {
+  .vocab-quiz-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vocab-q { padding: 1rem 0.9rem 1rem 1.1rem; }
+  .vocab-q-meaning-text { font-size: 1.125rem; }
+  .vocab-q-sentence { font-size: 1.0625rem; }
+  .vocab-q-sentence-box { padding: 0.7rem 0.8rem 0.8rem; }
+}
+
+/* 031 逐题结果表：桌面是表格，390px 窄屏每题拆成一张带标签的卡片。 */
+.vocab-grade-word { font-family: "Source Serif 4", Georgia, serif; font-size: 1rem; font-weight: 600; color: var(--ink); }
+.vocab-grade-table { border-collapse: collapse; }
+.vocab-grade-table th, .vocab-grade-table td { padding: 0.5rem 0.5rem; vertical-align: top; border-top: 1px solid var(--line); }
+/* 结果表不要像正文那样按任意字符断词：长词整体换到下一行（Exacerbate 不能拆成 Exace/rbate）。 */
+.vocab-grade-table td { overflow-wrap: break-word; word-break: normal; }
+.vocab-grade-table th { border-top: 0; font-weight: 500; }
+@media (max-width: 720px) {
+  .vocab-grade-table, .vocab-grade-table tbody, .vocab-grade-table tr, .vocab-grade-table td { display: block; width: 100%; }
+  .vocab-grade-table thead { display: none; }
+  .vocab-grade-table tr { margin-top: 0.6rem; border: 1px solid var(--line); border-radius: 0.875rem; padding: 0.25rem 0.5rem; }
+  .vocab-grade-table td { border-top: 0; padding: 0.25rem 0; }
+  .vocab-grade-table td::before { content: attr(data-label) "："; color: var(--mute); font-size: 0.75rem; }
+}
