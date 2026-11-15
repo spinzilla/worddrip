@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, RefreshCw, Search, X } from 'lucide-react';
+import DefinitionFillBar from './DefinitionFillBar';
 import { vocabApi } from '../../utils/vocab/api';
 import { createLatestGate, emptyBrowse, isBrowseEmpty } from '../../utils/vocab/browse';
 import {
@@ -315,6 +316,8 @@ export default function BrowsePanel({ active, onGoImport, hideImport }: Props) {
           <RefreshCw size={15} />
         </button>
       </div>
+
+      <DefinitionFillBar words={library.words} />
 
       {view !== 'upgrades' && (
         <div className="vocab-filters mt-3" data-testid="vocab-filters">

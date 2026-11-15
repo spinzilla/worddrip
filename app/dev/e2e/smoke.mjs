@@ -22,8 +22,11 @@ try {
   for (const f of [VIDEO, SUBTITLE]) if (!fs.existsSync(f)) throw new Error(`缺测试文件：${f}`);
   s = await start();
   ok('隔离启动', s.runDir);
-  page = await connect({ port: s.port });
+  page = await connect({ port: s.port, skipOnboarding: false });
   await page.waitReady('button');
+  await page.waitFor('[data-testid=onboarding]');
+  ok('隔离空库启动时引导出现');
+  await page.click('[data-testid=onboarding-close]');
   await page.screenshot(path.join(s.out, '01-home.png'));
   ok('主页截图');
 

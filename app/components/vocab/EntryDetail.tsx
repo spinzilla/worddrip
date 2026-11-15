@@ -9,6 +9,9 @@ import NotesSection from './NotesSection';
 import type { NoteHandlers } from './NotesSection';
 import ExamplesSection, { useMyExamples } from './ExamplesSection';
 import type { ExampleHandlers } from './ExamplesSection';
+import { ExtraDefinitionsEn, MyDefinitionsEn, useMyDefinitions } from './DefinitionsEn';
+type DefinitionsEnData = ReturnType<typeof useMyDefinitions>;
+import { definitionKey } from '../../utils/vocab/definitionEn';
 import VoiceButton from './VoiceButton';
 import { registerNoteSource } from '../../utils/quicknote/context';
 import { exampleKey, sensesFrom } from '../../utils/vocab/examples';
@@ -251,7 +254,7 @@ function MetadataForm({ group, onSaved }: { group: WordGroup; onSaved: (result: 
 /** 043：详情页里的「我的例句」用到的数据（EntryDetail 自己读，不用调用方传）。 */
 interface ExamplesData { byKey: Map<string, VocabExample[]>; handlers: ExampleHandlers; error: string }
 
-function WordDetail({ group, library, query, onOpen, onSaved, noteHandlers, examples }: {
+function WordDetail({ group, library, query, onOpen, onSaved, noteHandlers, examples, definitionsEn }: {
   group: WordGroup;
   library: Library;
   query: string;
@@ -259,8 +262,10 @@ function WordDetail({ group, library, query, onOpen, onSaved, noteHandlers, exam
   onSaved: (result: ReviewMetadataResult) => void;
   noteHandlers: NoteHandlers;
   examples: ExamplesData;
+  definitionsEn: DefinitionsEnData;
 }) {
   const myExamples = examples.byKey.get(exampleKey(group.word)) ?? [];
+  const myDefinitions = definitionsEn.byKey.get(definitionKey(group.word)) ?? [];
   const myNotes = notesForWord(library, group.word);
   const related = upgradesForWord(library, group.word);
   const notes = group.entries.map(entry => ({ entry, parts: splitNote(entry.note) }));
@@ -284,12 +289,12 @@ function WordDetail({ group, library, query, onOpen, onSaved, noteHandlers, exam
       </header>
 
       <Section title="意思" testId="review-definitions" icon={BookOpen} main>
+        <MyDefinitionsEn word={group.word} stored={myDefinitions} />
         {group.definitions.length === 0 ? (
           <div>
             {group.gloss
               ? <p className="vocab-wrap text-xl font-semibold leading-snug text-ink" data-testid="detail-gloss">{group.gloss}</p>
               : <p className="text-sm text-mute">笔记里没有写意思。</p>}
-            <p className="mt-1.5 text-xs text-mute">{IS_MOBILE ? '还没有英英释义' : '还没有导入英英释义（可在「导入」里导入期笔记）'}</p>
           </div>
         ) : (
           <ol className="space-y-4">
@@ -313,6 +318,7 @@ function WordDetail({ group, library, query, onOpen, onSaved, noteHandlers, exam
             ))}
           </ol>
         )}
+        <ExtraDefinitionsEn word={group.word} stored={myDefinitions} imported={group.definitions.map(d => ({ pos: d.pos, english: d.english }))} loaded={definitionsEn.loaded} />
       </Section>
 
       {(warnings.length > 0 || related.length > 0) && (
@@ -513,6 +519,7 @@ export default function EntryDetail({ selection, library, query, onOpen, onRevie
   listeningByKey?: Map<string, { word: string; cards: ReviewCard[] }>;
 }) {
   const examples = useMyExamples();
+  const definitionsEn = useMyDefinitions();
   // 055 随手记：详情开着时，Ctrl+J 记下的上下文就是这个词条。
   const shown = selection?.kind === 'word' ? library.wordByKey.get(selection.id) : selection?.kind === 'listening' ? listeningByKey.get(selection.id) : undefined;
   const noteWord = shown?.word;
@@ -525,7 +532,7 @@ export default function EntryDetail({ selection, library, query, onOpen, onRevie
   if (selection?.kind === 'word') {
     const group = library.wordByKey.get(selection.id);
     if (group) body = <>
-      <WordDetail key={group.key} group={group} library={library} query={query} onOpen={onOpen} onSaved={onReviewMetadataSaved} noteHandlers={noteHandlers} examples={examples} />
+      <WordDetail key={group.key} group={group} library={library} query={query} onOpen={onOpen} onSaved={onReviewMetadataSaved} noteHandlers={noteHandlers} examples={examples} definitionsEn={definitionsEn} />
       <ListeningWordSections cards={listeningByKey.get(group.key)?.cards ?? []} />
     </>;
   } else if (selection?.kind === 'listening') {

@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Error, ffi};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i32 = 12;
+pub const SCHEMA_VERSION: i32 = 14;
 
 const CREATE_V1_SCHEMA: &str = r#"
 CREATE TABLE upgrade_entry (
@@ -268,6 +268,45 @@ CREATE TABLE quick_note (
 CREATE INDEX quick_note_status_time ON quick_note(status, created_at);
 "#;
 
+/// 078：英英释义。按词挂（word_key 同笔记）；source：mine = 自己写的，dict:xxx = 词典查来的。
+/// 用 IF NOT EXISTS，因为 v11 → v12 的同步迁移要先有这张表才能给它加 sync_uid 和触发器。
+const CREATE_V13_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS vocab_definition_en (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  word_key TEXT NOT NULL CHECK (length(word_key) > 0),
+  word TEXT NOT NULL,
+  pos TEXT,
+  text TEXT NOT NULL CHECK (length(trim(text)) > 0),
+  source TEXT NOT NULL CHECK (source = 'mine' OR source LIKE 'dict:%'),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS vocab_definition_en_word ON vocab_definition_en(word_key, id);
+"#;
+
+/// 081：每日新词的候选池。每个词一行，记它的去向：known 认识 / taken 收下 / later 以后再说。
+/// decided_at 是本机日期 YYYY-MM-DD（later 过 7 天再出现）。主键是 word_key，所以同一个词只有一个去向，两台机器互相覆盖时按 updated_at 新的为准。
+const CREATE_V14_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS wordpack_pick (
+  word_key TEXT PRIMARY KEY CHECK (length(word_key) > 0),
+  word TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('known', 'taken', 'later')),
+  pack TEXT NOT NULL DEFAULT '',
+  decided_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- 学习计划：单行表，id 固定 'default'；packs 是词表标签的 JSON 数组，如 ["cet4","ngsl"]。
+-- 本机 localStorage 只当缓存，这张表才是准的（会同步、会跟整库搬家）。
+CREATE TABLE IF NOT EXISTS daily_plan (
+  id TEXT PRIMARY KEY CHECK (id = 'default'),
+  packs TEXT NOT NULL DEFAULT '[]',
+  per_day INTEGER NOT NULL DEFAULT 10 CHECK (per_day BETWEEN 1 AND 100),
+  card_on INTEGER NOT NULL DEFAULT 1 CHECK (card_on IN (0, 1)),
+  updated_at TEXT NOT NULL
+);
+"#;
+
 pub fn db_path() -> PathBuf {
   crate::paths::app_data_dir().join("vocab.db")
 }
@@ -366,8 +405,27 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
   if version <= 11 {
     // 071 同步：sync_uid、改动记录表和触发器（见 sync.rs）
     let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(CREATE_V13_SCHEMA)?;
+    tx.execute_batch(CREATE_V14_SCHEMA)?; // migrate_v12 给全部白名单表建触发器，表必须先在
     super::sync::migrate_v12(&tx)?;
     tx.pragma_update(None, "user_version", 12)?;
+    tx.commit()?;
+  }
+  if version <= 12 {
+    // 078 英英释义：新表 + 同步账本（migrate_v12 可重复执行，只补缺的）
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(CREATE_V13_SCHEMA)?;
+    tx.execute_batch(CREATE_V14_SCHEMA)?; // migrate_v12 给全部白名单表建触发器，表必须先在
+    super::sync::migrate_v12(&tx)?;
+    tx.pragma_update(None, "user_version", 13)?;
+    tx.commit()?;
+  }
+  if version <= 13 {
+    // 081 每日新词：候选池表 + 同步触发器（migrate_v12 可重复执行，只补缺的）
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(CREATE_V14_SCHEMA)?;
+    super::sync::migrate_v12(&tx)?;
+    tx.pragma_update(None, "user_version", 14)?;
     tx.commit()?;
   }
   Ok(())
@@ -466,7 +524,7 @@ mod tests {
   }
 
   #[test]
-  fn migrate_creates_all_eighteen_tables_and_sets_version() {
+  fn migrate_creates_all_tables_and_sets_version() {
     let conn = memory_db();
     migrate(&conn).unwrap();
 
@@ -480,7 +538,7 @@ mod tests {
       .unwrap()
       .collect::<rusqlite::Result<Vec<_>>>()
       .unwrap();
-    assert_eq!(tables, ["coach_essay", "coach_top_progress", "error_batch", "error_essay", "error_item", "error_todo", "error_top", "example_scene", "import_run", "quick_note", "review_definition", "review_definition_example", "review_event", "review_log", "review_word", "self_check", "sync_change", "sync_meta", "upgrade_entry", "upgrade_example", "vocab_example", "vocab_note"]);
+    assert_eq!(tables, ["coach_essay", "coach_top_progress", "daily_plan", "error_batch", "error_essay", "error_item", "error_todo", "error_top", "example_scene", "import_run", "quick_note", "review_definition", "review_definition_example", "review_event", "review_log", "review_word", "self_check", "sync_change", "sync_meta", "upgrade_entry", "upgrade_example", "vocab_definition_en", "vocab_example", "vocab_note", "wordpack_pick"]);
   }
 
   #[test]

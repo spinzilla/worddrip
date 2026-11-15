@@ -60,6 +60,14 @@ const gradleBuild = path.join(appDir, 'src-tauri', 'gen', 'android', 'app', 'bui
 fs.rmSync(path.join(gradleBuild, 'outputs', 'apk', 'arm64', 'debug'), { recursive: true, force: true });
 fs.rmSync(path.join(gradleBuild, 'intermediates', 'incremental', 'packageArm64Debug'), { recursive: true, force: true });
 
+// Tauri Android 的 Resource 基目录是 WebView asset URI，不是可供 Rust File::open 的磁盘路径。
+// 词包数据由 Rust include_bytes 直接编入 so；APK assets 只附带许可证，避免再打包一份词包。
+const androidAssets = path.join(appDir, 'src-tauri', 'gen', 'android', 'app', 'src', 'main', 'assets', 'wordpack');
+fs.mkdirSync(androidAssets, { recursive: true });
+// 旧版通过 Tauri 默认资源配置复制的词包不再需要（安卓运行时已由 include_bytes! 读取）。
+fs.rmSync(path.join(androidAssets, 'wordpack.json.gz'), { force: true });
+fs.copyFileSync(path.join(appDir, 'src-tauri', 'resources', 'wordpack', 'LICENSE-DATA.md'), path.join(androidAssets, 'LICENSE-DATA.md'));
+
 const patch = prepareTcpPipePatch();
 if (patch) env.JDK_JAVA_OPTIONS = [`--patch-module=java.base=${patch}`, env.JDK_JAVA_OPTIONS].filter(Boolean).join(' ');
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';

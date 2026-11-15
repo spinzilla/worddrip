@@ -3,6 +3,7 @@ import QuickNoteSheet from './QuickNoteSheet';
 import BrowsePanel from './BrowsePanel';
 import DuePanel from './DuePanel';
 import FirstTestPanel from './FirstTestPanel';
+import DailyWordsCard from './DailyWordsCard';
 import ImportPanel from './ImportPanel';
 import ExportPanel from './ExportPanel';
 import InboxPanel from './InboxPanel';
@@ -146,6 +147,7 @@ export default function VocabPage() {
           <h1 className="sr-only">{t('nav.vocab')}</h1>
           {/* 063：今日到期、首考、两个大按钮在任何标签下都不动；大按钮只做动作，只有下面的小标签切视图。 */}
           <div>
+            <DailyWordsCard />
             {/* 065：手机上切视图不重新读取（读取时「待考察」那段会消失几帧，页面变短）；数据变化由各面板自己的事件刷新。 */}
             <DuePanel refreshKey="m" startRequest={wordStart} />
             <FirstTestPanel refreshKey="m" />
@@ -198,6 +200,7 @@ export default function VocabPage() {
             </div>
           </div>
           {/* 复习区：宽屏两列并排，窄窗口上下排；不论切到哪个视图都在，切视图时不重读（和手机一致）。 */}
+          <DailyWordsCard />
           <div className="mb-3 grid items-start gap-4 lg:grid-cols-2 [&>section]:mb-0">
             <DuePanel refreshKey={`d${dataKey}`} />
             <FirstTestPanel refreshKey={`d${dataKey}`} />

@@ -30,6 +30,9 @@ pub struct VocabExportResult {
   /// 043：有例句时同目录写的 `我的例句.md`；没有例句为 None。
   pub examples_path: Option<String>,
   pub examples: usize,
+  /// 078：有英英释义时同目录写的 `我的英英释义.md`；没有为 None。
+  pub definitions_en_path: Option<String>,
+  pub definitions_en: usize,
 }
 
 fn render_upgrade(data: &BrowseData) -> Result<String, String> {
@@ -169,6 +172,7 @@ fn write_new(path: &Path, content: &str, protected: &[PathBuf]) -> Result<(), St
 
 pub const NOTES_FILE_NAME: &str = "我的笔记.md";
 pub const EXAMPLES_FILE_NAME: &str = "我的例句.md";
+pub const DEFINITIONS_EN_FILE_NAME: &str = "我的英英释义.md";
 
 /// 已写好的文件逐个删掉（倒序），把清理结果拼到错误后面。
 fn rollback(error: String, written: &[(&Path, &str)]) -> String {
@@ -199,6 +203,10 @@ pub fn export_at(db_path: &Path, kind: ExportKind, output: &Path) -> Result<Voca
   let examples = if kind == ExportKind::Review { super::examples::list_at(db_path)? } else { Vec::new() };
   let examples_markdown = super::examples::render_markdown(&examples);
   let examples_path = examples_markdown.as_ref().map(|_| output.with_file_name(EXAMPLES_FILE_NAME));
+  // 078：英英释义同理，只跟复习库导出，没有就不写。
+  let definitions_en = if kind == ExportKind::Review { super::definition_en::list_at(db_path)? } else { Vec::new() };
+  let definitions_markdown = super::definition_en::render_markdown(&definitions_en);
+  let definitions_path = definitions_markdown.as_ref().map(|_| output.with_file_name(DEFINITIONS_EN_FILE_NAME));
   if let Some(csv_path) = &source_csv {
     // 所有目标都先检查，避免 CSV 或笔记已存在时留下一个看似成功的 Markdown。
     let markdown_target = resolve_new_target(output, &protected)?;
@@ -216,6 +224,12 @@ pub fn export_at(db_path: &Path, kind: ExportKind, output: &Path) -> Result<Voca
       let examples_target = resolve_new_target(examples, &protected)?;
       if path_key(&markdown_target) == path_key(&examples_target) {
         return Err(format!("词库 Markdown 不能和例句文件同名（{EXAMPLES_FILE_NAME}）"));
+      }
+    }
+    if let Some(definitions) = &definitions_path {
+      let target = resolve_new_target(definitions, &protected)?;
+      if path_key(&markdown_target) == path_key(&target) {
+        return Err(format!("词库 Markdown 不能和英英释义文件同名（{DEFINITIONS_EN_FILE_NAME}）"));
       }
     }
   }
@@ -237,6 +251,14 @@ pub fn export_at(db_path: &Path, kind: ExportKind, output: &Path) -> Result<Voca
       return Err(rollback(error, &written));
     }
   }
+  if let (Some(file), Some(markdown), Some(csv_path)) = (&definitions_path, &definitions_markdown, &source_csv) {
+    if let Err(error) = write_new(file, markdown, &protected) {
+      let mut written: Vec<(&Path, &str)> = vec![(output, " Markdown"), (csv_path, "词条来源 CSV")];
+      if let Some(notes) = &notes_path { written.push((notes, "笔记文件")); }
+      if let Some(examples) = &examples_path { written.push((examples, "例句文件")); }
+      return Err(rollback(error, &written));
+    }
+  }
   Ok(VocabExportResult {
     path: output.to_string_lossy().into_owned(), kind,
     records: match kind { ExportKind::Upgrade => data.upgrades.len(), ExportKind::Review => data.review_words.len() },
@@ -246,6 +268,8 @@ pub fn export_at(db_path: &Path, kind: ExportKind, output: &Path) -> Result<Voca
     notes: notes.len(),
     examples_path: examples_path.map(|path| path.to_string_lossy().into_owned()),
     examples: examples.len(),
+    definitions_en_path: definitions_path.map(|path| path.to_string_lossy().into_owned()),
+    definitions_en: definitions_en.len(),
   })
 }
 #[cfg(test)]

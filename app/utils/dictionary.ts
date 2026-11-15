@@ -375,7 +375,7 @@ export const lookupWiktionary = async (word: string, lang: DictLang): Promise<Di
 
 const CAMBRIDGE_BI: Partial<Record<DictLang, string>> = { es: 'spanish-english', fr: 'french-english', de: 'german-english' };
 
-const fromSource = async (source: DictSource, word: string, lang: DictLang): Promise<DictEntry[] | null> => {
+export const fromSource = async (source: DictSource, word: string, lang: DictLang): Promise<DictEntry[] | null> => {
   const q = encodeURIComponent(word);
   if (source === 'cambridge' || source === 'cambridgeEn' || (source === 'cambridgeBi' && CAMBRIDGE_BI[lang])) {
     const path = source === 'cambridge' ? 'english-chinese-simplified' : source === 'cambridgeEn' ? 'english' : CAMBRIDGE_BI[lang];

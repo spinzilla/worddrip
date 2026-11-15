@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import type { DefinitionImportReport, DefinitionImportRequest, BrowseData, CoachArchiveData, CoachArchivePlan, CoachArchiveRequest, ErrorArchiveImportInput, ErrorImportReport, ImportPreviewReport, ImportReport, InboxConfirmRequest, InboxConfirmResult, ManualAddRequest, ManualAddResult, ExampleAddRequest, ExampleScene, SceneSetRequest, QuickNote, QuickNoteAddRequest, QuickNoteStatus, FlaggedSurface, NoteAddRequest, NoteUpdateRequest, ReviewEventRequest, ReviewEventResult, ReviewMetadataRequest, ReviewMetadataResult, ReviewSubmitRequest, ReviewSubmitResult, SourceSnapshot, VocabExportResult, VocabImportInput, VocabExample, VocabNote, VocabStats } from './types';
+import type { PickRow } from './dailyWords';
+import type { DefinitionImportReport, DefinitionImportRequest, BrowseData, CoachArchiveData, CoachArchivePlan, CoachArchiveRequest, ErrorArchiveImportInput, ErrorImportReport, ImportPreviewReport, ImportReport, InboxConfirmRequest, InboxConfirmResult, ManualAddRequest, ManualAddResult, ExampleAddRequest, ExampleScene, SceneSetRequest, QuickNote, QuickNoteAddRequest, QuickNoteStatus, FlaggedSurface, NoteAddRequest, NoteUpdateRequest, ReviewEventRequest, ReviewEventResult, ReviewMetadataRequest, ReviewMetadataResult, ReviewSubmitRequest, ReviewSubmitResult, SourceSnapshot, VocabExportResult, VocabImportInput, VocabExample, VocabNote, VocabStats, VocabDefinitionEn, DefinitionEnAddRequest, DefinitionEnUpdateRequest } from './types';
 import { exportFileName, type ExportKind } from './export';
 import { notifyQuickNotesChanged } from '../quicknote/changed';
 import { requestSync } from '../sync/manager';
@@ -99,6 +100,39 @@ export const vocabApi = {
     return invoke<ManualAddResult>('vocab_manual_add', { request });
   },
 
+  /** 081 每日新词：候选池（认识 / 收下 / 以后再说）。 */
+  pickList(): Promise<PickRow[]> {
+    return invoke<PickRow[]>('wordpack_pick_list');
+  },
+
+  /** 认识 / 以后再说（批量）；079 的词汇量测试也用这个写「认识」。 */
+  pickSet(items: { word: string; state: 'known' | 'later'; pack: string; date: string }[]): Promise<number> {
+    return thenSync(invoke<number>('wordpack_pick_set', { items }));
+  },
+
+  /** 079 重测词汇量：清掉某个来源（如 test-estimate）自动记下的「认识」，返回清了几个；用户自己决定的不动。 */
+  pickClearKnown(pack: string): Promise<number> {
+    return thenSync(invoke<number>('wordpack_pick_clear_known', { pack }));
+  },
+
+  /** 收下：写进词库（待首考）、英英释义，并记进候选池。 */
+  pickTake(request: { word: string; pack: string; pos: string; phonetic: string; chinese: string; english: string[]; issue: string; date: string }): Promise<{ id: string | null; definitionEnIds: number[]; source: string }> {
+    return thenSync(invoke('wordpack_pick_take', { request }));
+  },
+
+  /** 081 学习计划（单行表，会同步）；没设置过返回 null。 */
+  planGet(): Promise<{ packs: string[]; perDay: number; cardOn: boolean; updatedAt: string } | null> {
+    return invoke('daily_plan_get');
+  },
+
+  planSet(plan: { packs: string[]; perDay: number; cardOn: boolean }): Promise<{ packs: string[]; perDay: number; cardOn: boolean; updatedAt: string }> {
+    return thenSync(invoke('daily_plan_set', { plan }));
+  },
+
+  pickUndo(request: { word: string; previous: PickRow | null; takeId: string | null; definitionEnIds: number[] }): Promise<void> {
+    return thenSync(invoke<void>('wordpack_pick_undo', { request }));
+  },
+
   /** 040 词条笔记：只在本机存着，出题、判分、批改都不读。 */
   listNotes(): Promise<VocabNote[]> {
     return invoke<VocabNote[]>('vocab_notes');
@@ -124,6 +158,25 @@ export const vocabApi = {
   /** 给一个词存一句或几句；整批一个事务，有一句不合格就一句都不存。 */
   addExamples(request: ExampleAddRequest): Promise<VocabExample[]> {
     return invoke<VocabExample[]>('vocab_example_add', { request });
+  },
+
+  /** 078 英英释义：词典查来的 + 自己写的，按词挂。 */
+  listDefinitionsEn(): Promise<VocabDefinitionEn[]> {
+    return invoke<VocabDefinitionEn[]>('vocab_definitions_en');
+  },
+
+  /** 存一条或几条（同一个来源）；词典来的重复会被跳过，返回真正新存的。 */
+  addDefinitionsEn(request: DefinitionEnAddRequest): Promise<VocabDefinitionEn[]> {
+    return thenSync(invoke<VocabDefinitionEn[]>('vocab_definition_en_add', { request }));
+  },
+
+  /** 只能改自己写的。 */
+  updateDefinitionEn(request: DefinitionEnUpdateRequest): Promise<VocabDefinitionEn> {
+    return thenSync(invoke<VocabDefinitionEn>('vocab_definition_en_update', { request }));
+  },
+
+  deleteDefinitionEn(id: number): Promise<number> {
+    return thenSync(invoke<number>('vocab_definition_en_delete', { request: { id } }));
   },
 
   listScenes(): Promise<ExampleScene[]> {

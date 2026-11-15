@@ -323,6 +323,9 @@ export interface VocabExportResult {
   /** 043：有例句时同目录写的「我的例句.md」；没有例句为 null。 */
   examplesPath: string | null;
   examples: number;
+  /** 078：有英英释义时同目录写的「我的英英释义.md」；没有为 null。 */
+  definitionsEnPath: string | null;
+  definitionsEn: number;
 }
 
 // ---------- 040 词条笔记 ----------
@@ -572,3 +575,24 @@ export interface CoachArchivePlan {
   itemsAdded: number;
   topChanges: CoachTopChange[];
 }
+
+// ---------- 078 英英释义 ----------
+
+/** mine = 自己写的；dict:cambridge / dict:wiktionary / dict:local-wiktionary / dict:local = 词典查来的。 */
+export type DefinitionEnSource = string;
+
+/** 一条英英释义（存在 vocab_definition_en 表）。wordKey 是归一化后的词。 */
+export interface VocabDefinitionEn {
+  id: number;
+  wordKey: string;
+  word: string;
+  pos: string | null;
+  text: string;
+  source: DefinitionEnSource;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DefinitionEnItem { pos?: string | null; text: string }
+export interface DefinitionEnAddRequest { word: string; source: DefinitionEnSource; items: DefinitionEnItem[] }
+export interface DefinitionEnUpdateRequest { id: number; pos?: string | null; text: string }

@@ -14,7 +14,8 @@
 - 听写中听错、不认识的词可以一键并入词库。
 
 **词库与复习**
-- 每个词有释义、例句、用法、场景标签、自己的笔记和来源；全应用任何英文都能点词查词，内置本地词典并支持发音。
+- 没有现成词库也能开始：第一次打开时选目标（四六级、考研、雅思、托福、GRE 等），做一个约 50 题的词汇量测试；之后每天从内置考试词表里送几个新词，滑一下「认识 / 收下」，只有不认识的才进词库。
+- 每个词有释义（英英释义默认取词典，也可以自己写）、例句、用法、场景标签、自己的笔记和来源；全应用任何英文都能点词查词，内置本地词典并支持发音。
 - 到期复习：闪卡之外有「产出题」——回忆、改写、造句，按答题情况自动安排下次复习；新词先做首考和逐词预习。
 - 词库可以导入、导出成 Markdown，导出再导入不丢信息。
 
@@ -34,12 +35,12 @@
 
 ## 下载
 
-当前版本 **0.10.0**：
+当前版本 **0.11.0**：
 
 | 平台 | 下载 | 说明 |
 |---|---|---|
-| Windows 10/11（64 位） | [WordDrip_0.10.0_x64-setup.exe](https://vocab.uestceee.art/worddrip-updates/0.10.0/WordDrip_0.10.0_x64-setup.exe) | 按当前用户安装，不需要管理员。安装包没有微软代码签名，第一次运行 SmartScreen 可能拦一下，点「更多信息 → 仍要运行」。 |
-| 安卓 7.0+（arm64） | [worddrip-0.10.0.apk](https://vocab.uestceee.art/worddrip-updates/0.10.0/worddrip-0.10.0.apk) | 需要允许「安装未知应用」。 |
+| Windows 10/11（64 位） | [WordDrip_0.11.0_x64-setup.exe](https://vocab.uestceee.art/worddrip-updates/0.11.0/WordDrip_0.11.0_x64-setup.exe) | 按当前用户安装，不需要管理员。安装包没有微软代码签名，第一次运行 SmartScreen 可能拦一下，点「更多信息 → 仍要运行」。 |
+| 安卓 7.0+（arm64） | [worddrip-0.11.0.apk](https://vocab.uestceee.art/worddrip-updates/0.11.0/worddrip-0.11.0.apk) | 需要允许「安装未知应用」。 |
 
 装好以后，新版本会在应用里自动提示。
 
@@ -63,7 +64,7 @@ node dev/build-android.mjs   # 安卓 debug 包
 
 ## 这个项目是怎么做出来的
 
-作者是电子信息工程专业的学生，前端和 Rust 都是零基础。开发方式是：
+作者没有前端和 Rust 基础，基本不亲手写代码。开发方式是：
 
 1. 作者和 Claude 对话提需求、拍板方案；
 2. Claude 把工作拆成一张张**任务卡**（[`docs/tasks/`](docs/tasks/)），每张卡写清目标、要做成什么样、验收标准；
@@ -72,16 +73,16 @@ node dev/build-android.mjs   # 安卓 debug 包
 
 ### 参与开发的模型
 
-截至 0.10.0，一共做了 77 张任务卡。下表的卡数按 [`docs/ledger.md`](docs/ledger.md) 的派工记录统计：一张卡返工时换了人，两边各算一次，所以只是大概数字。
+截至 0.11.0，一共做了 82 张任务卡。下表的卡数按 [`docs/ledger.md`](docs/ledger.md) 的派工记录统计：一张卡返工时换了人，两边各算一次，所以只是大概数字。
 
 | 模型 | 通过什么工具调用 | 主要做什么 | 实现（张） | 验收（张） |
 |---|---|---|---|---|
 | **Claude Opus 5.5**（Anthropic） | Claude Code | 统筹：和作者对话、定方案、拆卡、复核每一批结果、发版；也写过架构和界面难卡 | 约 12 | — |
-| **Claude Sonnet 5.5**（Anthropic） | Claude Code | 界面和跨文件的难卡（手机版、同步、录入笔记、应用内更新等），以及要细心的验收 | 约 20 | 约 19 |
+| **Claude Sonnet 5.5**（Anthropic） | Claude Code | 界面和跨文件的难卡（手机版、同步、录入笔记、应用内更新等），以及要细心的验收 | 约 23 | 约 19 |
 | **Claude Haiku 5.5**（Anthropic） | Claude Code | 范围清楚的中小卡 | 约 5 | 约 2 |
 | **Kimi K3.1 Pro**（Moonshot AI） | Codex CLI、DeepSeek Harness | 早期的体力活主力：词库解析、导入导出、教练模块等 | 约 26 | 约 6 |
-| **GPT-6 Luna**（OpenAI） | opencode | 中小卡实现：同步服务器端、发版流水线、实测脚本等 | 约 8 | — |
-| **DeepSeek V4.1 Flash**（DeepSeek） | opencode、DeepSeek Harness | 后期的验收主力：照验收标准复跑、截图、找问题 | 约 4 | 约 44 |
+| **GPT-6 Luna**（OpenAI） | opencode | 中小卡实现：同步服务器端、发版流水线、实测脚本等 | 约 10 | — |
+| **DeepSeek V4.1 Flash**（DeepSeek） | opencode、DeepSeek Harness | 后期的验收主力：照验收标准复跑、截图、找问题 | 约 4 | 约 49 |
 | **GPT-6 Astra / GPT-6.1 Sol**（OpenAI） | Codex CLI | 早期少量交叉验收 | — | 各 1 |
 
 每张卡由谁实现、谁验收，返工了几次，都写在卡片开头和末尾的验收记录里。
@@ -106,3 +107,4 @@ scripts/dispatch.mjs  调度脚本入口（真正的调度器在另一个仓库�
 - 本项目基于 [LinguaClip](https://github.com/Samuelxiaozhuofeng/LinguaClip)（AGPL-3.0）改造，整体同样以 **[AGPL-3.0](LICENSE)** 发布。对上游做了哪些改动见 [`app/UPSTREAM.md`](app/UPSTREAM.md)。
 - 词典样例数据来自 [Wiktionary](https://www.wiktionary.org/)，经 [kaikki.org](https://kaikki.org/) 提取（CC BY-SA）。
 - 学术词汇统计使用 Coxhead (2000) 的 Academic Word List。
+- 内置考试与核心词表采用 [ECDICT](https://github.com/skywind3000/ECDICT)（MIT）和 [NGSL/NAWL](https://www.newgeneralservicelist.com/)（CC BY-SA 4.0）；筛选后的数据包按 CC BY-SA 4.0 发布，完整声明与引用见 [`app/src-tauri/resources/wordpack/LICENSE-DATA.md`](app/src-tauri/resources/wordpack/LICENSE-DATA.md)。

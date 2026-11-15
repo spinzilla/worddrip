@@ -18,6 +18,7 @@ import { AboutSection } from './UpdateUI';
 import BackupRow from './BackupRow';
 import SettingsTransfer from './SettingsTransfer';
 import SettingsSync from './SettingsSync';
+import { consumeDailySettingsRequest } from '../utils/vocab/dailyWords';
 import { consumeSyncTabRequest } from './SyncStatus';
 import { IS_MOBILE, settingsTabs, SettingsTab } from '../utils/platform';
 
@@ -68,7 +69,7 @@ const Settings: React.FC = () => {
 
   const [sectionLength, setSectionLength] = useState(Storage.DEFAULT_SECTION_LENGTH);
 
-  const [tab, setTab] = useState<Tab>(consumeSyncTabRequest() ? 'transfer' : settingsTabs(IS_MOBILE)[0]);
+  const [tab, setTab] = useState<Tab>(consumeSyncTabRequest() ? 'transfer' : consumeDailySettingsRequest() ? 'cards' : settingsTabs(IS_MOBILE)[0]);
   const [savedFlash, setSavedFlash] = useState(false);
   const flashTimer = useRef<number>(0);
   const ankiConnection = useAnkiConnection();

@@ -3,12 +3,24 @@ use super::schema;
 use super::sync::*;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value as Json;
+use std::collections::BTreeSet;
 
 fn db() -> Connection {
   let conn = Connection::open_in_memory().unwrap();
   conn.pragma_update(None, "foreign_keys", "ON").unwrap();
   schema::migrate(&conn).unwrap();
   conn
+}
+
+#[test]
+fn client_and_server_sync_table_lists_match() {
+  let source = include_str!("../../../../server/sync/store.py");
+  let block = source.split("TABLES = frozenset(").nth(1).expect("服务端 TABLES 清单").split("\n)").next().expect("TABLES 清单结束");
+  let server: BTreeSet<String> = block.lines().filter_map(|line| {
+    line.trim().trim_end_matches(',').trim().strip_prefix('"').and_then(|value| value.strip_suffix('"')).map(str::to_owned)
+  }).collect();
+  let client: BTreeSet<String> = SPECS.iter().map(|spec| spec.name.to_owned()).collect();
+  assert_eq!(client, server, "Rust SPECS 与 server/sync/store.py TABLES 应保持一致");
 }
 
 fn word(conn: &Connection, id: &str, note: &str) {
@@ -330,7 +342,7 @@ fn legacy_uid_is_deterministic_and_field_sensitive() {
 
 #[test]
 fn specs_cover_the_whitelist_and_every_table_has_triggers() {
-  assert_eq!(SPECS.len(), 19);
+  assert_eq!(SPECS.len(), 22);
   let conn = db();
   for s in SPECS {
     conn.prepare(&format!("SELECT * FROM {} LIMIT 0", s.name)).unwrap();
@@ -339,4 +351,95 @@ fn specs_cover_the_whitelist_and_every_table_has_triggers() {
     }
   }
   assert_eq!(count(&conn, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'sync_import_run%'"), 0);
+}
+
+/// 078：英英释义（我写的、词典的）从 A 机同步到 B 机，改了、删了也同步过去。
+#[test]
+fn definition_en_syncs_between_two_libraries_including_edit_and_delete() {
+  let a = db();
+  let b = db();
+  let req = |source: &str, text: &str| super::definition_en::DefinitionEnAddRequest {
+    word: "resilient".into(), source: source.into(),
+    items: vec![super::definition_en::DefinitionEnItem { pos: Some("adj.".into()), text: text.into() }],
+  };
+  super::definition_en::add_with_time(&a, req("mine", "able to recover"), "2026-11-14T01:00:00.000Z").unwrap();
+  super::definition_en::add_with_time(&a, req("dict:cambridge", "flexible and strong"), "2026-11-14T01:00:01.000Z").unwrap();
+  let to_remote = |changes: Vec<ChangeOut>| -> Vec<RemoteChange> {
+    changes.into_iter().map(|c| RemoteChange { table: c.table, id: c.id, updated_at: c.updated_at, deleted: c.deleted, device_id: "a".into(), data: c.data }).collect()
+  };
+  let pushed: Vec<_> = collect(&a, 100).unwrap().into_iter().filter(|c| c.table == "vocab_definition_en").collect();
+  assert_eq!(pushed.len(), 2);
+  apply(&b, &to_remote(pushed), "b", None).unwrap();
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM vocab_definition_en"), 2);
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM vocab_definition_en WHERE source = 'dict:cambridge' AND text = 'flexible and strong'"), 1);
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM sync_change WHERE dirty = 1"), 0);
+
+  clear_dirty(&a);
+  let id: i64 = a.query_row("SELECT id FROM vocab_definition_en WHERE source = 'mine'", [], |r| r.get(0)).unwrap();
+  super::definition_en::update_with_time(&a, super::definition_en::DefinitionEnUpdateRequest { id, pos: None, text: "bounces back".into() }, "2026-11-14T02:00:00.000Z").unwrap();
+  let dict_id: i64 = a.query_row("SELECT id FROM vocab_definition_en WHERE source <> 'mine'", [], |r| r.get(0)).unwrap();
+  super::definition_en::delete_in(&a, super::definition_en::DefinitionEnDeleteRequest { id: dict_id }).unwrap();
+  let pushed: Vec<_> = collect(&a, 100).unwrap().into_iter().filter(|c| c.table == "vocab_definition_en").collect();
+  assert_eq!(pushed.len(), 2);
+  apply(&b, &to_remote(pushed), "b", None).unwrap();
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM vocab_definition_en"), 1);
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM vocab_definition_en WHERE text = 'bounces back' AND source = 'mine'"), 1);
+}
+
+/// 081：候选池（认识 / 收下）从 A 机同步到 B 机；B 机收到后不会再把它们推回去，撤销（删除）也同步。
+#[test]
+fn wordpack_pick_syncs_between_two_libraries_and_is_not_pushed_back() {
+  use super::pick::{set_with_time, undo_with_time, PickItem, UndoRequest};
+  let a = db();
+  let b = db();
+  let to_remote = |changes: Vec<ChangeOut>| -> Vec<RemoteChange> {
+    changes.into_iter().map(|c| RemoteChange { table: c.table, id: c.id, updated_at: c.updated_at, deleted: c.deleted, device_id: "a".into(), data: c.data }).collect()
+  };
+  let item = |word: &str, state: &str| PickItem { word: word.into(), state: state.into(), pack: "四级".into(), date: "2026-11-14".into() };
+  set_with_time(&a, vec![item("able", "known"), item("abroad", "later")], "2026-11-14T01:00:00.000Z").unwrap();
+  clear_dirty(&b);
+  let pushed: Vec<_> = collect(&a, 100).unwrap().into_iter().filter(|c| c.table == "wordpack_pick").collect();
+  assert_eq!(pushed.len(), 2);
+  apply(&b, &to_remote(pushed), "b", None).unwrap();
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM wordpack_pick WHERE state = 'known' AND word_key = 'able'"), 1);
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM wordpack_pick"), 2);
+  let back: Vec<_> = collect(&b, 100).unwrap().into_iter().filter(|c| c.table == "wordpack_pick").collect();
+  assert!(back.is_empty(), "拉下来的候选池不该再推回去");
+  clear_dirty(&a);
+  undo_with_time(&a, UndoRequest { word: "able".into(), previous: None, take_id: None, definition_en_ids: vec![] }, "2026-11-14T02:00:00.000Z").unwrap();
+  let pushed: Vec<_> = collect(&a, 100).unwrap().into_iter().filter(|c| c.table == "wordpack_pick").collect();
+  apply(&b, &to_remote(pushed), "b", None).unwrap();
+  assert_eq!(count(&b, "SELECT COUNT(*) FROM wordpack_pick"), 1);
+}
+
+/// 081 返工：学习计划（单行表 daily_plan）从 A 机同步到 B 机，B 机改了之后能同步回 A 机，拉下来的不会再推回去。
+#[test]
+fn daily_plan_syncs_between_two_libraries_both_ways() {
+  use super::pick::{plan_get_in, plan_set_with_time, PlanRow};
+  let a = db();
+  let b = db();
+  let to_remote = |changes: Vec<ChangeOut>, dev: &str| -> Vec<RemoteChange> {
+    changes.into_iter().map(|c| RemoteChange { table: c.table, id: c.id, updated_at: c.updated_at, deleted: c.deleted, device_id: dev.into(), data: c.data }).collect()
+  };
+  let plan = |packs: &[&str], per_day: i64, card_on: bool| PlanRow { packs: packs.iter().map(|s| s.to_string()).collect(), per_day, card_on, updated_at: String::new() };
+  plan_set_with_time(&a, plan(&["cet4", "ngsl"], 5, true), "2026-11-14T01:00:00.000Z").unwrap();
+  clear_dirty(&b);
+  let pushed: Vec<_> = collect(&a, 100).unwrap().into_iter().filter(|c| c.table == "daily_plan").collect();
+  assert_eq!(pushed.len(), 1);
+  assert_eq!(pushed[0].id, "default");
+  apply(&b, &to_remote(pushed, "a"), "b", None).unwrap();
+  let got = plan_get_in(&b).unwrap().unwrap();
+  assert_eq!((got.packs, got.per_day, got.card_on), (vec!["cet4".to_string(), "ngsl".to_string()], 5, true));
+  let back: Vec<_> = collect(&b, 100).unwrap().into_iter().filter(|c| c.table == "daily_plan").collect();
+  assert!(back.is_empty(), "拉下来的学习计划不该再推回去");
+  // B 机改了计划，A 机收到后跟着变
+  std::thread::sleep(std::time::Duration::from_millis(5));
+  plan_set_with_time(&b, plan(&["gre"], 20, false), "2026-11-14T03:00:00.000Z").unwrap();
+  clear_dirty(&a);
+  let pushed: Vec<_> = collect(&b, 100).unwrap().into_iter().filter(|c| c.table == "daily_plan").collect();
+  assert_eq!(pushed.len(), 1);
+  apply(&a, &to_remote(pushed, "b"), "a", None).unwrap();
+  let got = plan_get_in(&a).unwrap().unwrap();
+  assert_eq!((got.packs, got.per_day, got.card_on), (vec!["gre".to_string()], 20, false));
+  assert_eq!(count(&a, "SELECT COUNT(*) FROM daily_plan"), 1);
 }

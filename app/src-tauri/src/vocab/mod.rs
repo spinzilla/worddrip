@@ -3,6 +3,7 @@
 pub mod archive;
 pub mod commands;
 pub mod definition;
+pub mod definition_en;
 pub mod errors;
 pub mod examples;
 pub mod export;
@@ -13,6 +14,7 @@ pub mod manual;
 pub mod metadata;
 pub mod models;
 pub mod notes;
+pub mod pick;
 pub mod query;
 pub mod quicknote;
 pub mod review;

@@ -8,7 +8,7 @@ import net from 'node:net';
 export function ps(command, { timeout = 30000 } = {}) {
   return execFileSync(
     'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command],
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; ${command}`],
     { encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
   );
 }

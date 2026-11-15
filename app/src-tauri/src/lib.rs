@@ -41,6 +41,7 @@ mod tts_gec;
 #[cfg(not(target_os = "android"))]
 mod gpus;
 mod vocab;
+mod wordpack;
 mod whisper_setup;
 #[cfg(not(target_os = "android"))]
 mod word_order;
@@ -162,6 +163,11 @@ pub fn run() {
       vocab::commands::vocab_coach_browse,
       vocab::commands::vocab_coach_archive_preview,
       vocab::commands::vocab_coach_archive,
+      wordpack::wordpack_info,
+      wordpack::wordpack_list,
+      wordpack::wordpack_lookup,
+      wordpack::wordpack_band,
+      wordpack::wordpack_license,
       vocab::commands::vocab_review_submit,
       vocab::commands::vocab_review_event,
       vocab::commands::vocab_review_flagged,
@@ -176,6 +182,10 @@ pub fn run() {
       vocab::commands::vocab_examples,
       vocab::commands::vocab_example_add,
       vocab::commands::vocab_example_delete,
+      vocab::commands::vocab_definitions_en,
+      vocab::commands::vocab_definition_en_add,
+      vocab::commands::vocab_definition_en_update,
+      vocab::commands::vocab_definition_en_delete,
       vocab::commands::vocab_scenes,
       vocab::commands::quicknote_list,
       vocab::commands::quicknote_add,
@@ -183,6 +193,13 @@ pub fn run() {
       vocab::commands::quicknote_mark,
       vocab::commands::quicknote_delete,
       vocab::commands::vocab_scene_set,
+      vocab::commands::wordpack_pick_list,
+      vocab::commands::wordpack_pick_set,
+      vocab::commands::wordpack_pick_take,
+      vocab::commands::wordpack_pick_clear_known,
+      vocab::commands::wordpack_pick_undo,
+      vocab::commands::daily_plan_get,
+      vocab::commands::daily_plan_set,
       #[cfg(not(target_os = "android"))]
       trash_file
     ])

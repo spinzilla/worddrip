@@ -105,6 +105,9 @@ export default function ExportPanel({ active }: { active: boolean }) {
       <p className="mt-2 text-sm leading-6 text-mute">
         保留已导入的记录行、业务数据和顺序；不还原源文件中未导入的说明、其他章节、空行、换行格式或原行号。已存在的文件不会被覆盖。
       </p>
+      <p className="mt-2 text-sm leading-6 text-mute">
+        Markdown 是导出给人看的，不支持导入。要换设备并保留笔记、例句和英英释义，请使用「整库搬家」（.wdlib）。
+      </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">{renderButton('upgrade')}{renderButton('review')}</div>
       <div aria-live="polite">
         {notice && <p className="mt-4 text-sm text-success">{notice}</p>}
@@ -130,6 +133,12 @@ export default function ExportPanel({ active }: { active: boolean }) {
           <div className="mt-2 rounded-lg border border-success/30 bg-success-soft p-3 text-sm text-ink" data-testid="export-examples-path">
             <div>{result.examples} 句我的例句已保存到：</div>
             <div className="mt-1 break-all font-mono text-xs">{result.examplesPath}</div>
+          </div>
+        )}
+        {result?.definitionsEnPath && (
+          <div className="mt-2 rounded-lg border border-success/30 bg-success-soft p-3 text-sm text-ink" data-testid="export-definitions-en-path">
+            <div>{result.definitionsEn} 条英英释义已保存到：</div>
+            <div className="mt-1 break-all font-mono text-xs">{result.definitionsEnPath}</div>
           </div>
         )}
         {error && <p role="alert" className="mt-4 whitespace-pre-wrap text-sm text-danger">{error}</p>}

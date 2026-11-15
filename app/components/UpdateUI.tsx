@@ -5,6 +5,7 @@ import { IS_MOBILE } from '../utils/platform';
 import {
   autoCheckOn, bannerVisible, checkUpdate, hasFound, loadCurrent, openApkInBrowser, setAutoCheck, snoozeUpdate, startUpdate, useUpdate,
 } from '../utils/update';
+import { wordpackLicense } from '../utils/wordpack';
 
 // 应用内更新（任务卡 077）：顶部提示条 + 设置里的「关于」。逻辑都在 utils/update.ts。
 
@@ -68,7 +69,18 @@ export const AboutSection: React.FC = () => {
   const t = useT();
   const u = useUpdate();
   const [auto, setAuto] = useState(autoCheckOn());
+  const [licenseOpen, setLicenseOpen] = useState(false);
+  const [license, setLicense] = useState<string | null>(null);
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   useEffect(loadCurrent, []);
+  const toggleLicense = async () => {
+    const next = !licenseOpen;
+    setLicenseOpen(next);
+    if (next && !license && !licenseError) {
+      try { setLicense(await wordpackLicense()); }
+      catch (error) { setLicenseError(String(error)); }
+    }
+  };
   const found = hasFound(u.phase);
   const status = u.phase === 'checking' ? t('update.checking')
     : found ? t('update.found', { v: u.version })
@@ -91,6 +103,15 @@ export const AboutSection: React.FC = () => {
           {t('update.lastCheck', { t: u.lastCheck ? fmtTime(u.lastCheck) : t('update.never') })}
         </p>
         {IS_MOBILE && <p className="mt-2 text-xs text-mute">{t('update.installHint')}</p>}
+        <div className="mt-4 border-t border-line pt-3">
+          <button type="button" onClick={toggleLicense} aria-expanded={licenseOpen} data-testid="wordpack-license-toggle"
+            className="press max-w-full rounded-full border border-transparent bg-shade px-3 py-2 text-left text-sm font-medium text-ink hover:bg-line whitespace-normal break-words">
+            词表数据：ECDICT（MIT）、NGSL/NAWL（CC BY-SA 4.0）{licenseOpen ? '（收起）' : '（查看许可证）'}
+          </button>
+          {licenseOpen && <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs text-mute" data-testid="wordpack-license">
+            {license ?? licenseError ?? '正在读取许可证…'}
+          </pre>}
+        </div>
       </Group>
     </div>
   );

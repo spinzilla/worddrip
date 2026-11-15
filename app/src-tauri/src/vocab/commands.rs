@@ -169,6 +169,27 @@ pub fn vocab_example_add(request: super::examples::ExampleAddRequest) -> Result<
   super::examples::add_at(&schema::db_path(), request)
 }
 
+/// 078 英英释义：只读列出全部（按词归一化键分组）。
+#[tauri::command]
+pub fn vocab_definitions_en() -> Result<Vec<super::definition_en::VocabDefinitionEn>, String> {
+  super::definition_en::list_at(&schema::db_path())
+}
+
+#[tauri::command]
+pub fn vocab_definition_en_add(request: super::definition_en::DefinitionEnAddRequest) -> Result<Vec<super::definition_en::VocabDefinitionEn>, String> {
+  super::definition_en::add_at(&schema::db_path(), request)
+}
+
+#[tauri::command]
+pub fn vocab_definition_en_update(request: super::definition_en::DefinitionEnUpdateRequest) -> Result<super::definition_en::VocabDefinitionEn, String> {
+  super::definition_en::update_at(&schema::db_path(), request)
+}
+
+#[tauri::command]
+pub fn vocab_definition_en_delete(request: super::definition_en::DefinitionEnDeleteRequest) -> Result<i64, String> {
+  super::definition_en::delete_at(&schema::db_path(), request)
+}
+
 /// 048 例句场景标签：只读列出全部。
 #[tauri::command]
 pub fn vocab_scenes() -> Result<Vec<super::scenes::ExampleScene>, String> {
@@ -287,4 +308,42 @@ pub fn sync_status(request: SyncKeyRequest) -> Result<super::sync::Status, Strin
 #[tauri::command]
 pub fn sync_reset() -> Result<(), String> {
   super::sync::reset_all(&sync_conn()?).map_err(|e| format!("重置同步状态失败：{e}"))
+}
+
+/// 081 每日新词：候选池（认识 / 收下 / 以后再说）。
+#[tauri::command]
+pub fn wordpack_pick_list() -> Result<Vec<super::pick::PickRow>, String> {
+  super::pick::list_at(&schema::db_path())
+}
+
+#[tauri::command]
+pub fn wordpack_pick_set(items: Vec<super::pick::PickItem>) -> Result<usize, String> {
+  super::pick::set_at(&schema::db_path(), items)
+}
+
+/// 079 重测词汇量：清掉某个来源自动记下的「认识」，返回清了几个。
+#[tauri::command]
+pub fn wordpack_pick_clear_known(pack: String) -> Result<usize, String> {
+  super::pick::clear_known_at(&schema::db_path(), &pack)
+}
+
+#[tauri::command]
+pub fn wordpack_pick_take(request: super::pick::TakeRequest) -> Result<super::pick::TakeResult, String> {
+  super::pick::take_at(&schema::db_path(), request)
+}
+
+/// 081 学习计划（单行表 daily_plan，会同步）。没设置过返回 null。
+#[tauri::command]
+pub fn daily_plan_get() -> Result<Option<super::pick::PlanRow>, String> {
+  super::pick::plan_get_at(&schema::db_path())
+}
+
+#[tauri::command]
+pub fn daily_plan_set(plan: super::pick::PlanRow) -> Result<super::pick::PlanRow, String> {
+  super::pick::plan_set_at(&schema::db_path(), plan)
+}
+
+#[tauri::command]
+pub fn wordpack_pick_undo(request: super::pick::UndoRequest) -> Result<(), String> {
+  super::pick::undo_at(&schema::db_path(), request)
 }

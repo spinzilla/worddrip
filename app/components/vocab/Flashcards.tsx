@@ -20,6 +20,8 @@ import { groupNotes, noteKey, removeNote, upsertNote } from '../../utils/vocab/n
 import type { VocabNote } from '../../utils/vocab/types';
 import NotesSection from './NotesSection';
 import ExamplesSection, { useMyExamples } from './ExamplesSection';
+import { FlashDefinitionsEn, useMyDefinitions } from './DefinitionsEn';
+import { definitionKey } from '../../utils/vocab/definitionEn';
 import SceneTag, { useExampleScenes } from './SceneTag';
 import VoiceButton from './VoiceButton';
 import { findWordAt } from '../Lookable';
@@ -62,8 +64,10 @@ export default function Flashcards({ initial, onExit }: Props) {
     return () => { alive = false; };
   }, []);
   const myExamples = useMyExamples();
+  const myDefinitionsEn = useMyDefinitions();
   const scenes = useExampleScenes();
   const word: DueWord = currentCard(state);
+  const storedDefinitionsEn = myDefinitionsEn.byKey.get(definitionKey(word.word)) ?? [];
 
   // 048：翻到背面时，给这个词还没标过的例句补场景标签（一个词一次请求；标过、试过的不再发）。
   const ensureScenes = scenes.ensure;
@@ -299,37 +303,39 @@ export default function Flashcards({ initial, onExit }: Props) {
               <div className="vocab-flash-back-grid">
                 <div className="min-w-0" data-testid="flash-definitions">
                   <div className="vocab-q-label"><span>英文释义</span></div>
-                  {word.definitions.length === 0 ? (
-                    <p className="mt-2 text-sm text-mute">{IS_MOBILE ? '这个词还没有英英释义，先看下面的完整备注。' : '还没有导入英英释义（可在「导入」里导入期笔记），先看右边的完整备注。'}</p>
-                  ) : (
-                    <ol className="vocab-flash-defs">
-                      {word.definitions.map((definition, index) => (
-                        <li key={`${definition.sourceFile}-${definition.sourceLine}-${index}`} className="vocab-flash-def">
-                          <div className="flex flex-wrap items-baseline gap-x-2">
-                            {word.definitions.length > 1 && <span className="text-sm font-semibold text-mute">{index + 1}.</span>}
-                            {definition.pos && <span className="vocab-q-pos">{definition.pos}</span>}
-                          </div>
-                          {definition.english && <p className="vocab-flash-def-en">{definition.english}</p>}
-                          {definition.chinese && <p className="vocab-flash-def-zh">{definition.chinese}</p>}
-                          {definition.examples.length > 0 && (
-                            <ul className="mt-2 space-y-1.5">
-                              {realExamplesFirst(definition.examples).map(example => (
-                                <li key={example.seq} className="vocab-flash-example">
-                                  <div className="flex min-w-0 items-start gap-1">
-                                    <span className="vocab-wrap min-w-0 flex-1">{example.sentence}
-                                      {example.ai && <span className="vocab-q-tag ml-2 not-italic">AI 例句</span>}
-                                      <SceneTag sentence={example.sentence} control={scenes.control} />
-                                    </span>
-                                    <VoiceButton text={example.sentence} kind="sentence" />
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  )}
+                  <FlashDefinitionsEn word={word.word} stored={storedDefinitionsEn} imported={word.definitions.map(d => ({ pos: d.pos, english: d.english }))} loaded={myDefinitionsEn.loaded}>
+                    {word.definitions.length === 0 && storedDefinitionsEn.length > 0 ? null : word.definitions.length === 0 ? (
+                      <p className="mt-2 text-sm text-mute">{IS_MOBILE ? '这个词还没有英英释义，先看下面的完整备注。' : '还没有导入英英释义（可在「导入」里导入期笔记），先看右边的完整备注。'}</p>
+                    ) : (
+                      <ol className="vocab-flash-defs">
+                        {word.definitions.map((definition, index) => (
+                          <li key={`${definition.sourceFile}-${definition.sourceLine}-${index}`} className="vocab-flash-def" data-testid="flash-def-en-imported">
+                            <div className="flex flex-wrap items-baseline gap-x-2">
+                              {word.definitions.length > 1 && <span className="text-sm font-semibold text-mute">{index + 1}.</span>}
+                              {definition.pos && <span className="vocab-q-pos">{definition.pos}</span>}
+                            </div>
+                            {definition.english && <p className="vocab-flash-def-en">{definition.english}</p>}
+                            {definition.chinese && <p className="vocab-flash-def-zh">{definition.chinese}</p>}
+                            {definition.examples.length > 0 && (
+                              <ul className="mt-2 space-y-1.5">
+                                {realExamplesFirst(definition.examples).map(example => (
+                                  <li key={example.seq} className="vocab-flash-example">
+                                    <div className="flex min-w-0 items-start gap-1">
+                                      <span className="vocab-wrap min-w-0 flex-1">{example.sentence}
+                                        {example.ai && <span className="vocab-q-tag ml-2 not-italic">AI 例句</span>}
+                                        <SceneTag sentence={example.sentence} control={scenes.control} />
+                                      </span>
+                                      <VoiceButton text={example.sentence} kind="sentence" />
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </FlashDefinitionsEn>
                   {/* 043：「我的例句」放在释义下面（左栏通常有空位，不把卡片撑高）；data-flash-notes：点这里不翻面、快捷键让给输入框。 */}
                   {(() => {
                     const wordExamples = myExamples.byKey.get(exampleKey(word.word)) ?? [];

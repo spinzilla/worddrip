@@ -4,7 +4,7 @@
 //! 同步身份（sid）：
 //! - TEXT 主键表：主键本身；
 //! - 复合主键表：各主键列按固定顺序用 `\u{1f}`（ASCII 单元分隔符，正常文字里不会出现）拼起来；
-//! - 自增整数主键表（review_log、review_event、vocab_note、vocab_example、quick_note）：新加的 `sync_uid` 列
+//! - 自增整数主键表（review_log、review_event、vocab_note、vocab_example、vocab_definition_en、quick_note）：新加的 `sync_uid` 列
 //!   （新行 `u:` + 随机 32 位十六进制；老行迁移时按确定性算法回填 `legacy:…`，见 [`legacy_uid`]）。
 
 use rusqlite::{params, types::Value, types::ValueRef, Connection, OptionalExtension};
@@ -50,7 +50,10 @@ pub const SPECS: &[Spec] = &[
   Spec { name: "review_event", key: Key::Auto(&["word_id", "review_date", "kind", "correct", "created_at"]), time_cols: &["created_at"], append_only: true },
   spec("vocab_note", Key::Auto(&["word_key", "word", "created_at"]), &["updated_at", "created_at"]),
   spec("vocab_example", Key::Auto(&["word_key", "word", "created_at"]), &["created_at"]),
+  spec("vocab_definition_en", Key::Auto(&["word_key", "word", "created_at"]), &["updated_at", "created_at"]),
   spec("example_scene", Key::Text("key"), &["updated_at"]),
+  spec("wordpack_pick", Key::Text("word_key"), &["updated_at"]),
+  spec("daily_plan", Key::Text("id"), &["updated_at"]),
   spec("quick_note", Key::Auto(&["created_at", "device_id", "ctx_kind"]), &["updated_at", "created_at"]),
   spec("error_top", Key::Text("id"), &[]),
   spec("error_batch", Key::Text("id"), &[]),

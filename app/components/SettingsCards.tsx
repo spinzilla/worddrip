@@ -9,6 +9,7 @@ import { useT } from '../utils/i18n';
 import { getAudioPaddingConfig, getMasteredBtn, getPracticeConfig, getWordFront, getWordVoice, saveAudioPaddingConfig, savePracticeConfig, setPracticeFlag } from '../utils/storage';
 import type { WordFront } from '../types';
 import { IS_MOBILE } from '../utils/platform';
+import DailyWordsSettings from './vocab/DailyWordsSettings';
 
 // Cards keep their own clip of the line (utils/clips.ts): on / off, which kind, and how far along.
 const ClipsRow: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
@@ -122,6 +123,7 @@ const SettingsCards: React.FC<{ onSaved: () => void; children: React.ReactNode }
   const setAudioPadding = (v: typeof audioPadding) => { setPadding(v); saveAudioPaddingConfig(v); onSaved(); };
   return (
     <div className="space-y-10">
+      <DailyWordsSettings onSaved={onSaved} />
       <Group title={t('settings.group.review')}>
         <Field label={t('settingsGeneral.autoAddReview')} hint={t('settingsGeneral.autoAddReviewHint')}>
           <label className="flex items-center gap-2 text-sm cursor-pointer">

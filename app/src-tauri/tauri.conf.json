@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "english-studio",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "identifier": "com.englishstudio.app",
   "build": {
     "frontendDist": "../dist",
@@ -51,6 +51,10 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": false,
+    "resources": {
+      "resources/wordpack/wordpack.json.gz": "wordpack/wordpack.json.gz",
+      "resources/wordpack/LICENSE-DATA.md": "wordpack/LICENSE-DATA.md"
+    },
     "targets": [
       "dmg",
       "app"

@@ -16,7 +16,7 @@ const REQUIRED_TABLES: &[&str] = &[
   "upgrade_entry", "upgrade_example", "self_check", "review_word", "import_run",
   "error_top", "error_batch", "error_item", "error_todo", "error_essay", "review_log",
   "coach_essay", "coach_top_progress", "review_definition", "review_definition_example",
-  "review_event", "vocab_note", "vocab_example", "example_scene", "quick_note",
+  "review_event", "vocab_note", "vocab_example", "example_scene", "quick_note", "vocab_definition_en",
 ];
 const BACKUP_PREFIX: &str = "vocab-before-import-";
 static TRANSFER_LOCK: Mutex<()> = Mutex::new(());
@@ -250,6 +250,12 @@ mod tests {
       VALUES ('serendipity', 'serendipity', '一条笔记', '词库', '2026-01-02', '2026-01-02')", []).unwrap();
     conn.execute("INSERT INTO vocab_example (word_key, word, sentence, source, created_at)
       VALUES ('serendipity', 'serendipity', 'A lucky discovery.', '自己写', '2026-01-02')", []).unwrap();
+    conn.execute("INSERT INTO vocab_definition_en (word_key, word, pos, text, source, created_at, updated_at)
+      VALUES ('serendipity', 'serendipity', 'n.', 'a lucky discovery', 'mine', '2026-01-02', '2026-01-02')", []).unwrap();
+    conn.execute("INSERT INTO wordpack_pick (word_key, word, state, pack, decided_at, updated_at)
+      VALUES ('able', 'able', 'known', '四级', '2026-01-02', '2026-01-02')", []).unwrap();
+    conn.execute("INSERT INTO daily_plan (id, packs, per_day, card_on, updated_at)
+      VALUES ('default', '[\"cet4\"]', 5, 1, '2026-01-02')", []).unwrap();
     conn.execute("INSERT INTO quick_note (body, created_at, updated_at, device_id)
       VALUES ('一条随手记', '2026-01-02', '2026-01-02', 'test')", []).unwrap();
     conn.execute("INSERT INTO review_definition (word_id, source_file, source_line, pos, english, chinese)
@@ -279,7 +285,7 @@ mod tests {
     assert!(result.backup_path.is_some());
     let conn = schema::open(&target).unwrap();
     assert_eq!(conn.query_row("SELECT status || '|' || level || '|' || due || '|' || note FROM review_word", [], |r| r.get::<_, String>(0)).unwrap(), "L2|2|2020-01-01|进度备注");
-    for table in ["review_word", "review_log", "vocab_note", "vocab_example", "quick_note", "upgrade_example", "review_definition_example"] {
+    for table in ["review_word", "review_log", "vocab_note", "vocab_example", "vocab_definition_en", "wordpack_pick", "daily_plan", "quick_note", "upgrade_example", "review_definition_example"] {
       assert_eq!(conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get::<_, i64>(0)).unwrap(), 1, "{table}");
     }
   }
@@ -301,8 +307,8 @@ mod tests {
     let n = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
     assert_eq!(n("SELECT COUNT(*) FROM sync_meta WHERE k LIKE 'cursor:%' OR k LIKE 'init:%'"), 0);
     assert_eq!(n("SELECT COUNT(*) FROM sync_change WHERE sid = 'old-ghost'"), 0);
-    // 种子数据：9 张表各 1 行（词、日志、笔记、例句、随手记、义项、义项例句、升级词、升级例句）
-    assert_eq!(n("SELECT COUNT(*) FROM sync_change WHERE dirty = 1"), 9);
+    // 种子数据：12 张表各 1 行（词、日志、笔记、例句、英英释义、候选池、学习计划、随手记、义项、义项例句、升级词、升级例句）
+    assert_eq!(n("SELECT COUNT(*) FROM sync_change WHERE dirty = 1"), 12);
     assert_eq!(n("SELECT COUNT(*) FROM sync_change WHERE dirty = 0"), 0);
   }
 

@@ -35,10 +35,12 @@ import { startClips } from './utils/clips';
 import { CustomConfig, CustomPick } from './utils/customPick';
 import { setCustomPos, setLastWay } from './utils/storage';
 import ManualAddHost from './components/vocab/ManualAddHost';
+import OnboardingHost from './components/vocab/Onboarding';
 import { NoteJobToast } from './components/vocab/NoteJobUI';
 import { requestOpenInbox } from './utils/vocab/noteJob';
 import { startAutoSync } from './utils/sync';
 import { onGotoSyncSettings } from './components/SyncStatus';
+import { onGotoDailySettings } from './utils/vocab/dailyWords';
 import QuickNoteHost from './components/QuickNoteHost';
 import { registerNoteSource } from './utils/quicknote/context';
 import { IS_MOBILE } from './utils/platform';
@@ -66,6 +68,7 @@ export default function App() {
   // Cards left by videos deleted in older versions: ask once whether they go too.
   useEffect(() => { askAboutOrphans().catch(console.error); }, []);
   useEffect(() => { startAutoSync(); return onGotoSyncSettings(() => setAppState(AppState.SETTINGS)); }, []);
+  useEffect(() => onGotoDailySettings(() => setAppState(AppState.SETTINGS)), []);
   // 077：启动约 10 秒后查一次新版本，之后每 6 小时一次（设置里可关）。
   useEffect(() => startAutoCheck(), []);
 
@@ -536,6 +539,7 @@ export default function App() {
       <DialogHost />
       {/* 042：手动加词表单和「已在词库」详情，任何页面的查词卡都能打开。 */}
       <ManualAddHost />
+      <OnboardingHost onFinished={() => setAppState(AppState.VOCAB)} />
       {/* 073：录笔记识别全部结束、而用户在别的页面时的提示条。 */}
       <NoteJobToast onGo={() => { requestOpenInbox(); setAppState(AppState.VOCAB); }} />
       {/* 055：随手记快捷框（Ctrl+J），所有页面都有。 */}

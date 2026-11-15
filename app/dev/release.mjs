@@ -371,13 +371,14 @@ function upload(version, dryRun) {
     ['scp', [...files.slice(0, 3), `tencent:${remoteDir}/`]],
     ['scp', [files[3], `tencent:${updatesRoot}/latest.json.tmp`]],
     ['scp', [files[4], `tencent:${updatesRoot}/android.json.tmp`]],
-    ['ssh', ['tencent', `cd ${updatesRoot} && cp latest.json.tmp ${version}/latest.json && cp android.json.tmp ${version}/android.json && mv latest.json.tmp latest.json && mv android.json.tmp android.json`]],
+    ['ssh', ['tencent', `cd ${updatesRoot} && cp latest.json.tmp ${version}/latest.json && cp android.json.tmp ${version}/android.json && mv latest.json.tmp latest.json && mv android.json.tmp android.json && chmod 644 latest.json android.json`]],
   ];
   for (const [command, args] of commands) {
     if (dryRun) {
       console.log([command, ...args].map(quote).join(' '));
     } else {
-      const result = spawnSync(command, args, { cwd: repoDir, env: process.env, encoding: 'utf8', shell: isWindows, timeout, stdio: 'inherit' });
+      // ssh/scp 是真正的 exe，不走 shell：Windows 上走 cmd 时，远程命令里的 && 会被本机 cmd 截走（0.11.0 发版时最后一步因此失败）。
+      const result = spawnSync(command, args, { cwd: repoDir, env: process.env, encoding: 'utf8', shell: false, timeout, stdio: 'inherit' });
       if (result.error) fail(`${command} 启动失败：${result.error.message}`);
       if (result.status !== 0) fail(`${command} 退出码 ${result.status ?? '未知'}`);
     }

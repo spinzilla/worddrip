@@ -18,6 +18,7 @@ import type { BrowseReviewWord } from '../../utils/vocab/types';
 import RecallReview from './RecallReview';
 import FirstTestPreview from './FirstTestPreview';
 import { onVocabChanged } from '../../utils/vocab/manualAdd';
+import { onFirstTestRequest } from '../../utils/vocab/dailyWords';
 import './vocab.css';
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -136,6 +137,25 @@ export default function FirstTestPanel({ refreshKey }: Props) {
   };
 
   // 同日复检：同一个词换一个新语境；永远不重复首轮和已用过的题面。
+  // 081 每日新词收完后「去做首考」：选好那一期，等词读进来就直接开始。
+  const goRef = useRef(false);
+  const beginRef = useRef(begin);
+  beginRef.current = begin;
+  useEffect(() => onFirstTestRequest(requested => {
+    setIssue(requested);
+    // 首考已经在进行中就不再自动开始（load 也不会刷新），免得结束后凭空又开一轮
+    goRef.current = !openRef.current;
+    startRef.current?.scrollIntoView?.({ block: 'center' });
+    load();
+  }), [load]);
+  useEffect(() => {
+    if (!goRef.current || loading || mode !== null) return;
+    // 读完了：有词就开始；这一期没有词或读取出错，也把一次性标志复位，免得之后某次刷新读到词时自动开始
+    const ready = !error && batch.queue.length > 0;
+    goRef.current = false;
+    if (ready) beginRef.current();
+  }, [loading, batch, mode, error]);
+
   const makeRecheck = useCallback(async (wordId: string, usedSurface: string): Promise<RecallQuestion | string> => {
     const word = batch.queue.find(entry => entry.id === wordId);
     if (!word) return '找不到这个词，无法换语境。';

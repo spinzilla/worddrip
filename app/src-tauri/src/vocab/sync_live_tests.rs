@@ -108,7 +108,7 @@ fn sync(conn: &Connection, space: &Space, device: &str) -> Result<(usize, usize,
 fn n(conn: &Connection, sql: &str) -> i64 {
   conn.query_row(sql, [], |r| r.get(0)).unwrap()
 }
-const TABLES: [&str; 11] = ["review_word", "review_log", "review_event", "vocab_note", "vocab_example", "quick_note", "review_definition", "review_definition_example", "upgrade_entry", "upgrade_example", "self_check"];
+const TABLES: [&str; 14] = ["wordpack_pick", "daily_plan", "review_word", "review_log", "review_event", "vocab_note", "vocab_example", "vocab_definition_en", "quick_note", "review_definition", "review_definition_example", "upgrade_entry", "upgrade_example", "self_check"];
 fn counts(conn: &Connection) -> Vec<i64> {
   TABLES.iter().map(|t| n(conn, &format!("SELECT COUNT(*) FROM {t}"))).collect()
 }
