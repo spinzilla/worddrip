@@ -185,3 +185,5 @@
 - 2026/11/14 13:24:15 079-首次引导与词汇量测试：实现 @claude-sonnet，验收 @opencode-ds-flash，通过但有 4 条警告（返工 0 次），花费 $2.21，待你看
 - 2026-11-14 082 新用户起步收尾：实现 @opencode-luna；修复 13 项提示级问题（PowerShell 中文、引导续开、不可信测试结果、减少动画、smoke 引导回归、每日新词翻面/等待、闪卡释义顺序与截图、同步表一致性、导出/词包说明、台账）；tsc/build、cargo test 274、Node 单测、smoke/daily-words/onboarding/definition-en 真实窗口及截图检查通过；安卓真机和线上同步未验证，待独立验收
 - 2026/11/14 14:03:01 082-小问题清理-新用户起步收尾：实现 @opencode-luna，验收 @opencode-ds-flash，通过但有 3 条警告（返工 0 次），待你看
+- 2026-11-14 083 更新防丢数据：实现 @claude-sonnet；更新前同步+确认、设置自动快照与恢复弹窗、.wdlib 可带设置、启动记录与复制诊断信息、新装引导找回入口；tsc/build/cargo test 278/smoke/library-transfer/新单测/restore-083 真实窗口/安卓打包通过；更新前同步真实窗口、077 更新脚本复跑、安卓设备上未验，待验收
+- 2026/11/14 20:11:08 083-更新防丢数据-设置备份与诊断记录：实现 @claude-sonnet，验收 @opencode-ds-flash，通过但有 7 条警告（返工 0 次），花费 $1.66，待你看

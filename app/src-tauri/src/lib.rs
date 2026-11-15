@@ -21,6 +21,7 @@ mod decode;
 #[cfg(not(target_os = "android"))]
 mod device;
 mod dicts;
+mod diag;
 mod dicts_import;
 #[cfg(not(target_os = "android"))]
 mod dtw;
@@ -149,6 +150,10 @@ pub fn run() {
       vocab::commands::sync_finish,
       vocab::commands::sync_status,
       vocab::commands::sync_reset,
+      diag::diag_snapshot_write,
+      diag::diag_snapshot_read,
+      diag::diag_record_launch,
+      diag::diag_log_tail,
       vocab::commands::vocab_library_export,
       vocab::commands::vocab_library_preview,
       vocab::commands::vocab_library_import,

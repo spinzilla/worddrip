@@ -35,12 +35,12 @@
 
 ## 下载
 
-当前版本 **0.11.0**：
+当前版本 **0.11.1**：
 
 | 平台 | 下载 | 说明 |
 |---|---|---|
-| Windows 10/11（64 位） | [WordDrip_0.11.0_x64-setup.exe](https://vocab.uestceee.art/worddrip-updates/0.11.0/WordDrip_0.11.0_x64-setup.exe) | 按当前用户安装，不需要管理员。安装包没有微软代码签名，第一次运行 SmartScreen 可能拦一下，点「更多信息 → 仍要运行」。 |
-| 安卓 7.0+（arm64） | [worddrip-0.11.0.apk](https://vocab.uestceee.art/worddrip-updates/0.11.0/worddrip-0.11.0.apk) | 需要允许「安装未知应用」。 |
+| Windows 10/11（64 位） | [WordDrip_0.11.1_x64-setup.exe](https://vocab.uestceee.art/worddrip-updates/0.11.1/WordDrip_0.11.1_x64-setup.exe) | 按当前用户安装，不需要管理员。安装包没有微软代码签名，第一次运行 SmartScreen 可能拦一下，点「更多信息 → 仍要运行」。 |
+| 安卓 7.0+（arm64） | [worddrip-0.11.1.apk](https://vocab.uestceee.art/worddrip-updates/0.11.1/worddrip-0.11.1.apk) | 需要允许「安装未知应用」。 |
 
 装好以后，新版本会在应用里自动提示。
 
@@ -73,16 +73,16 @@ node dev/build-android.mjs   # 安卓 debug 包
 
 ### 参与开发的模型
 
-截至 0.11.0，一共做了 82 张任务卡。下表的卡数按 [`docs/ledger.md`](docs/ledger.md) 的派工记录统计：一张卡返工时换了人，两边各算一次，所以只是大概数字。
+截至 0.11.1，一共做了 83 张任务卡。下表的卡数按 [`docs/ledger.md`](docs/ledger.md) 的派工记录统计：一张卡返工时换了人，两边各算一次，所以只是大概数字。
 
 | 模型 | 通过什么工具调用 | 主要做什么 | 实现（张） | 验收（张） |
 |---|---|---|---|---|
 | **Claude Opus 5.5**（Anthropic） | Claude Code | 统筹：和作者对话、定方案、拆卡、复核每一批结果、发版；也写过架构和界面难卡 | 约 12 | — |
-| **Claude Sonnet 5.5**（Anthropic） | Claude Code | 界面和跨文件的难卡（手机版、同步、录入笔记、应用内更新等），以及要细心的验收 | 约 23 | 约 19 |
+| **Claude Sonnet 5.5**（Anthropic） | Claude Code | 界面和跨文件的难卡（手机版、同步、录入笔记、应用内更新等），以及要细心的验收 | 约 24 | 约 19 |
 | **Claude Haiku 5.5**（Anthropic） | Claude Code | 范围清楚的中小卡 | 约 5 | 约 2 |
 | **Kimi K3.1 Pro**（Moonshot AI） | Codex CLI、DeepSeek Harness | 早期的体力活主力：词库解析、导入导出、教练模块等 | 约 26 | 约 6 |
 | **GPT-6 Luna**（OpenAI） | opencode | 中小卡实现：同步服务器端、发版流水线、实测脚本等 | 约 10 | — |
-| **DeepSeek V4.1 Flash**（DeepSeek） | opencode、DeepSeek Harness | 后期的验收主力：照验收标准复跑、截图、找问题 | 约 4 | 约 49 |
+| **DeepSeek V4.1 Flash**（DeepSeek） | opencode、DeepSeek Harness | 后期的验收主力：照验收标准复跑、截图、找问题 | 约 4 | 约 50 |
 | **GPT-6 Astra / GPT-6.1 Sol**（OpenAI） | Codex CLI | 早期少量交叉验收 | — | 各 1 |
 
 每张卡由谁实现、谁验收，返工了几次，都写在卡片开头和末尾的验收记录里。

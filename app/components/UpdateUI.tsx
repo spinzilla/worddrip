@@ -3,9 +3,11 @@ import { Btn, Group } from './ui';
 import { useT } from '../utils/i18n';
 import { IS_MOBILE } from '../utils/platform';
 import {
-  autoCheckOn, bannerVisible, checkUpdate, hasFound, loadCurrent, openApkInBrowser, setAutoCheck, snoozeUpdate, startUpdate, useUpdate,
+  autoCheckOn, bannerVisible, checkUpdate, hasFound, loadCurrent, openApkInBrowser, setAutoCheck, snoozeUpdate, startUpdate, startUpdateGuarded, useUpdate,
 } from '../utils/update';
 import { wordpackLicense } from '../utils/wordpack';
+import { getSyncConfig } from '../utils/sync/manager';
+import { copyDiagnostics } from '../utils/diagCopy';
 
 // 应用内更新（任务卡 077）：顶部提示条 + 设置里的「关于」。逻辑都在 utils/update.ts。
 
@@ -30,10 +32,10 @@ export const UpdateBanner: React.FC = () => {
         <span className="font-medium min-w-0 flex-1 basis-40">{t('update.found', { v: u.version })}</span>
         <div className="flex flex-wrap items-center gap-2">
           {u.phase === 'available' && <>
-            <Btn tone="accent" size="sm" onClick={() => startUpdate()} data-testid="update-now">{t('update.now')}</Btn>
-            <Btn size="sm" onClick={snoozeUpdate} data-testid="update-later">{t('update.later')}</Btn>
+            <Btn tone="accent" size="sm" disabled={u.preparing} onClick={() => startUpdateGuarded()} data-testid="update-now">{t('update.now')}</Btn>
+            <Btn size="sm" disabled={u.preparing} onClick={snoozeUpdate} data-testid="update-later">{t('update.later')}</Btn>
           </>}
-          {u.phase === 'dlFailed' && <Btn tone="accent" size="sm" onClick={() => startUpdate()}>{t('update.retry')}</Btn>}
+          {u.phase === 'dlFailed' && <Btn tone="accent" size="sm" disabled={u.preparing} onClick={() => startUpdateGuarded()}>{t('update.retry')}</Btn>}
           {u.phase === 'needPermission' && <Btn tone="accent" size="sm" onClick={() => startUpdate()}>{t('update.continue')}</Btn>}
           {u.phase === 'installFailed' && <>
             <Btn size="sm" onClick={() => startUpdate()}>{t('update.retry')}</Btn>
@@ -41,6 +43,8 @@ export const UpdateBanner: React.FC = () => {
           </>}
         </div>
       </div>
+      {u.preparing && <div className="mt-2 text-xs text-mute" data-testid="update-preparing">{t('update.preparing')}</div>}
+      {u.phase === 'available' && !u.preparing && !getSyncConfig() && <div className="mt-2 text-xs text-mute" data-testid="update-nosync">{t('update.noSyncHint')}</div>}
       {u.phase === 'downloading' && (
         <div className="mt-2" data-testid="update-progress">
           <div className="h-1.5 rounded-full bg-line overflow-hidden"><div className="h-full bg-accent" style={{ width: `${u.pct ?? 0}%` }} /></div>
@@ -69,6 +73,7 @@ export const AboutSection: React.FC = () => {
   const t = useT();
   const u = useUpdate();
   const [auto, setAuto] = useState(autoCheckOn());
+  const [diag, setDiag] = useState('');
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [license, setLicense] = useState<string | null>(null);
   const [licenseError, setLicenseError] = useState<string | null>(null);
@@ -103,6 +108,10 @@ export const AboutSection: React.FC = () => {
           {t('update.lastCheck', { t: u.lastCheck ? fmtTime(u.lastCheck) : t('update.never') })}
         </p>
         {IS_MOBILE && <p className="mt-2 text-xs text-mute">{t('update.installHint')}</p>}
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <Btn size="sm" onClick={async () => { setDiag(await copyDiagnostics() ? t('diag.copied') : t('diag.copyFailed')); }} data-testid="diag-copy">{t('diag.copy')}</Btn>
+          {diag && <span className="text-xs text-mute break-words min-w-0" role="status" data-testid="diag-status">{diag}</span>}
+        </div>
         <div className="mt-4 border-t border-line pt-3">
           <button type="button" onClick={toggleLicense} aria-expanded={licenseOpen} data-testid="wordpack-license-toggle"
             className="press max-w-full rounded-full border border-transparent bg-shade px-3 py-2 text-left text-sm font-medium text-ink hover:bg-line whitespace-normal break-words">

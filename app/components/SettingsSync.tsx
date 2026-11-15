@@ -5,6 +5,7 @@ import {
   currentSyncCode, DEFAULT_SYNC_URL, deleteRemoteSync, dismissSyncNotice, enableSync, getSyncUrlDraft, setSyncUrlDraft, getSyncConfig, getSyncState, joinSync, leaveSync,
   NO_BUILT_IN_SYNC_MESSAGE, refreshInfo, runSync, setAutoSync, setSyncBaseUrl, subscribeSync, syncAvailable,
 } from '../utils/sync';
+import { clearSyncJoinRequest, peekSyncJoinRequest } from './SyncStatus';
 
 const timeText = (ms: number | null) => (ms ? new Date(ms).toLocaleString('zh-CN', { hour12: false }) : '还没有同步过');
 const sizeText = (bytes: number) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
@@ -17,7 +18,7 @@ export default function SettingsSync() {
   const code = currentSyncCode();
   const [busy, setBusy] = useState<'enable' | 'join' | 'delete' | null>(null);
   const [joinText, setJoinText] = useState('');
-  const [joining, setJoining] = useState(false);
+  const [joining, setJoining] = useState(peekSyncJoinRequest);
   const [error, setError] = useState('');
   const [reveal, setReveal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -26,6 +27,7 @@ export default function SettingsSync() {
   const on = state.phase !== 'off' && !!config;
 
   useEffect(() => { if (on) void refreshInfo(); }, [on]);
+  useEffect(() => { clearSyncJoinRequest(); }, []);
 
   const doEnable = async () => {
     setBusy('enable'); setError('');

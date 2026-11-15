@@ -972,6 +972,15 @@ export const zh: Record<keyof typeof en, string> = {
   'update.lastCheck': '上次检查：{t}',
   'update.never': '还没检查过',
   'update.installHint': '手机更新会下载安装包并弹出系统安装确认；第一次要允许「安装未知应用」。',
+  'update.preparing': '正在同步本机改动，同步完再安装…',
+  'update.noSyncHint': '建议先在 设置 → 同步 里开同步，或导出整库再更新。',
+  'update.unsyncedTitle': '同步没成功',
+  'update.unsyncedBody': '同步没成功，现在安装万一出问题，最近的改动可能找不回来。仍要安装吗？',
+  'update.unsyncedGo': '仍要安装',
+  'update.unsyncedNo': '先不装',
+  'diag.copy': '复制诊断信息',
+  'diag.copied': '已复制（不含密钥）。',
+  'diag.copyFailed': '复制失败，请再试一次。',
 
   // --- Podcasts (Pro: pro/PodcastPicker.tsx, pro/ListenPage.tsx) ---
   'import.podcastFormat': '这一集的音频格式不支持（只认 mp3 / m4a）',

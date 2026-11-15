@@ -9,6 +9,7 @@ import { start, stop } from './launch.mjs';
 import { serveRelease } from '../update-server.mjs';
 
 const version = process.argv[2] || '0.9.99';
+const cur = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 const srv = await serveRelease({ version });
 const runDir = path.join('D:/tmp/es-e2e', `update-${Date.now()}`);
 fs.mkdirSync(runDir, { recursive: true });
@@ -24,9 +25,9 @@ try {
   const out = f => path.join(s.out, f);
   await page.evaluate(`localStorage.setItem('worddrip.update.dryRun','1')`);
   await page.clickText(['设置', 'Settings']);
-  await page.waitText(['当前版本 0.9.2', 'Version 0.9.2']);
+  await page.waitText(['当前版本 ' + cur, 'Version ' + cur]);
   await page.screenshot(out('about-desktop.png'));
-  ok('设置 → 关于 显示 0.9.2');
+  ok('设置 → 关于 显示 ' + cur);
   await page.clickText(['检查更新', 'Check for updates']);
   await page.waitUntil('出现更新提示条', `!!document.querySelector('[data-testid=update-banner]')`);
   await page.screenshot(out('banner-desktop.png'));

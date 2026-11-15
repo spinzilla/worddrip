@@ -1,6 +1,6 @@
 #[tauri::command]
-pub fn vocab_library_export() -> Result<Vec<u8>, String> {
-  super::library::export_at(&schema::db_path())
+pub fn vocab_library_export(settings: Option<String>) -> Result<Vec<u8>, String> {
+  super::library::export_with_settings_at(&schema::db_path(), settings.as_deref())
 }
 
 #[tauri::command]

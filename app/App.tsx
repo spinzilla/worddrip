@@ -36,6 +36,7 @@ import { CustomConfig, CustomPick } from './utils/customPick';
 import { setCustomPos, setLastWay } from './utils/storage';
 import ManualAddHost from './components/vocab/ManualAddHost';
 import OnboardingHost from './components/vocab/Onboarding';
+import SettingsRestorePrompt from './components/SettingsRestorePrompt';
 import { NoteJobToast } from './components/vocab/NoteJobUI';
 import { requestOpenInbox } from './utils/vocab/noteJob';
 import { startAutoSync } from './utils/sync';
@@ -537,6 +538,8 @@ export default function App() {
         onLand={() => setAppState(s => (s === AppState.UPLOAD ? AppState.PODCASTS : s))} />}
       
       <DialogHost />
+      {/* 083：本机设置像是被清空、但数据目录里有快照时，问要不要恢复。 */}
+      <SettingsRestorePrompt />
       {/* 042：手动加词表单和「已在词库」详情，任何页面的查词卡都能打开。 */}
       <ManualAddHost />
       <OnboardingHost onFinished={() => setAppState(AppState.VOCAB)} />

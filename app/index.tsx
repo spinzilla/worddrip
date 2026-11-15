@@ -10,6 +10,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import RestoreFailed from './components/RestoreFailed';
 import { afterStart, bootRestore } from './utils/restore';
+import { initSettingsBackup } from './utils/settingsBackup';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -31,6 +32,8 @@ const boot = async () => {
     root.render(<RestoreFailed pending={r.pending} error={r.error} />);
     return;
   }
+  // 083：渲染前读设置快照、决定要不要问恢复、记启动记录；出任何错都不挡启动。
+  await Promise.race([initSettingsBackup(), new Promise(r => setTimeout(r, 3000))]);
   render();
   afterStart();
 };

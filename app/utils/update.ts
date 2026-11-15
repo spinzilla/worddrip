@@ -7,6 +7,11 @@ import { appCacheDir, join } from '@tauri-apps/api/path';
 import { writeFile } from '@tauri-apps/plugin-fs';
 import { appVersion, checkForUpdate, openExternal, relaunchApp, type Update } from './desktop';
 import { IS_MOBILE } from './platform';
+import { dialog } from '../components/Dialog';
+import { getSyncConfig, syncBeforeInstall } from './sync/manager';
+import { snapshotNow } from './settingsBackup';
+import { guardBeforeInstall } from './updateGuard';
+import { t } from './i18n';
 import {
   CHECK_EVERY_MS, CHECK_FIRST_MS, UPDATE_BASE, classifyUpdateError, compareVersions, downloadAndVerifyApk,
   fetchAndroidManifest, isNewerAndroid, shouldShowBanner, snoozeFor, type AndroidManifest, type Snooze, type UpdateErrorCode,
@@ -19,6 +24,8 @@ export type Phase =
 export type UpdateState = {
   phase: Phase; current: string; version: string; notes: string; pct: number | null;
   error: UpdateErrorCode | null; lastCheck: number | null; apkUrl: string;
+  /** 083：点了更新、正在做安装前的同步（推送本机改动）。 */
+  preparing: boolean;
 };
 
 const K_AUTO = 'worddrip.update.auto';
@@ -39,7 +46,7 @@ const readSnooze = (): Snooze => { try { return JSON.parse(ls.get(K_SNOOZE) || '
 
 let state: UpdateState = {
   phase: 'idle', current: '', version: '', notes: '', pct: null, error: null,
-  lastCheck: Number(ls.get(K_LAST)) || null, apkUrl: '',
+  lastCheck: Number(ls.get(K_LAST)) || null, apkUrl: '', preparing: false,
 };
 let update: Update | null = null;
 let manifest: AndroidManifest | null = null;
@@ -194,6 +201,30 @@ async function startDesktop(): Promise<void> {
     console.error('update install failed', err);
     set({ phase: 'installFailed' });
   }
+}
+
+/**
+ * 083：点「现在更新」/下载失败后的「重试」走这里：先拍设置快照；已加入同步就先推一次，
+ * 推送失败要用户确认「仍要安装」。通过后才真正开始下载安装。
+ */
+export async function startUpdateGuarded(): Promise<void> {
+  if (state.preparing || !['available', 'dlFailed'].includes(state.phase)) return;
+  set({ preparing: true });
+  let go = false;
+  try {
+    go = await guardBeforeInstall({
+      snapshot: snapshotNow,
+      hasSync: () => getSyncConfig() !== null,
+      syncNow: syncBeforeInstall,
+      // 弹确认框前先收起「正在同步…」那行，免得和「同步没成功」同时出现。
+      confirmUnsynced: async () => { set({ preparing: false }); return (await dialog.confirm(
+        t('update.unsyncedTitle'), t('update.unsyncedBody'), { ok: t('update.unsyncedGo'), cancel: t('update.unsyncedNo') },
+      )) === true; },
+    });
+  } finally {
+    set({ preparing: false });
+  }
+  if (go) await startUpdate();
 }
 
 /** 点「现在更新」/「重试」/（手机）允许安装后的「继续安装」。 */

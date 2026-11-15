@@ -56,6 +56,17 @@ class MainActivity : TauriActivity() {
       startActivity(intent)
     }
 
+    // 083 诊断：只读，返回包的首次安装时间和最近更新时间（毫秒时间戳，JSON）。读不到返回 "{}"。
+    @JavascriptInterface
+    fun installTimes(): String {
+      return try {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        "{\"firstInstall\":${info.firstInstallTime},\"lastUpdate\":${info.lastUpdateTime}}"
+      } catch (e: Exception) {
+        "{}"
+      }
+    }
+
     // 返回 "ok" 或失败原因。只允许安装缓存目录里的文件。
     @JavascriptInterface
     fun installApk(path: String): String {

@@ -30,6 +30,8 @@ pub struct LibrarySummary {
   pub quick_notes: i64,
   pub exported_at: Option<String>,
   pub schema_version: i32,
+  /// 083：文件里带了设置（JSON 文本）；老文件没有。只在导入前预览时带给前端，让用户决定要不要恢复。
+  pub settings: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,7 +66,10 @@ fn backup_to(conn: &Connection, path: &Path) -> Result<(), String> {
 }
 
 /// 在线备份期间 SQLite 自己处理读写一致性；导出时间只写进副本，不改正在使用的库。
-pub fn export_at(db_path: &Path) -> Result<Vec<u8>, String> {
+pub fn export_at(db_path: &Path) -> Result<Vec<u8>, String> { export_with_settings_at(db_path, None) }
+
+/// 083：`settings` 是前端拼好的设置 JSON，只写进导出副本里的 english_studio_settings 表，本机库不留。
+pub fn export_with_settings_at(db_path: &Path, settings: Option<&str>) -> Result<Vec<u8>, String> {
   let _guard = TRANSFER_LOCK.lock().map_err(|_| "整库搬家的锁已损坏，请重启应用。")?;
   if !db_path.is_file() { return Err("本机还没有词库，先添加或导入词条再导出。".into()); }
   let dir = transfer_dir(db_path);
@@ -79,6 +84,12 @@ pub fn export_at(db_path: &Path) -> Result<Vec<u8>, String> {
       DELETE FROM english_studio_export;").map_err(|e| format!("写入导出时间失败：{e}"))?;
     copy.execute("INSERT INTO english_studio_export (exported_at) VALUES (?1)", [Local::now().to_rfc3339()])
       .map_err(|e| format!("写入导出时间失败：{e}"))?;
+    if let Some(json) = settings {
+      copy.execute_batch("CREATE TABLE IF NOT EXISTS english_studio_settings (json TEXT NOT NULL); DELETE FROM english_studio_settings;")
+        .map_err(|e| format!("写入设置失败：{e}"))?;
+      copy.execute("INSERT INTO english_studio_settings (json) VALUES (?1)", [json])
+        .map_err(|e| format!("写入设置失败：{e}"))?;
+    }
     drop(copy);
     fs::read(&snapshot).map_err(|e| format!("读取词库副本失败：{e}"))
   })();
@@ -137,6 +148,10 @@ fn prepare_incoming(db_path: &Path, bytes: &[u8]) -> Result<(PathBuf, LibrarySum
           .map_err(|e| format!("读取导出时间失败：{e}"))?
       } else { None },
       schema_version: schema::SCHEMA_VERSION,
+      settings: if has_table(&conn, "english_studio_settings")? {
+        conn.query_row("SELECT json FROM english_studio_settings LIMIT 1", [], |row| row.get(0)).optional()
+          .map_err(|e| format!("读取设置失败：{e}"))?
+      } else { None },
     };
     drop(conn);
     Ok(summary)
@@ -212,7 +227,10 @@ where F: FnOnce(&Path, &Path) -> io::Result<()> {
     let opened = schema::open(db_path).map_err(|e| format!("新词库已放入，但重新打开失败：{e}；可用自动备份恢复。"))?;
     // 071：换了一份库，同步状态（cursor、别的设备留下的账本）全部作废，所有行重新记成待推送。
     super::sync::reset_all(&opened).map_err(|e| format!("新词库已放入，但重置同步状态失败：{e}；可用自动备份恢复。"))?;
+    // 083：文件里带的设置（含密钥）不留在本机词库里；前端预览时已经拿走，用户选了才恢复。
+    opened.execute_batch("DROP TABLE IF EXISTS english_studio_settings;").map_err(|e| format!("清理导入文件里的设置失败：{e}"))?;
     drop(opened);
+    let summary = LibrarySummary { settings: None, ..summary };
     Ok(LibraryImportResult { summary, backup_path: backup.map(|p| p.to_string_lossy().into_owned()) })
   })();
   if result.is_err() { let _ = fs::remove_file(&staged); }
@@ -288,6 +306,27 @@ mod tests {
     for table in ["review_word", "review_log", "vocab_note", "vocab_example", "vocab_definition_en", "wordpack_pick", "daily_plan", "quick_note", "upgrade_example", "review_definition_example"] {
       assert_eq!(conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get::<_, i64>(0)).unwrap(), 1, "{table}");
     }
+  }
+
+  /// 083：带设置导出 → 预览能读到；老文件（不带）预览 settings 为空；导入后本机库里不留设置表。
+  #[test]
+  fn settings_ride_along_and_are_not_kept_in_the_live_db() {
+    let dir = Dir::new("settings");
+    let source = dir.0.join("source.db");
+    let target = dir.0.join("target.db");
+    seed_source(&source);
+    schema::open(&target).unwrap();
+    let plain = export_at(&source).unwrap();
+    assert_eq!(preview_at(&target, &plain).unwrap().settings, None, "旧格式没有设置，照常能导入");
+    let with = export_with_settings_at(&source, Some("{\"k\":\"v\"}")).unwrap();
+    assert_eq!(preview_at(&target, &with).unwrap().settings.as_deref(), Some("{\"k\":\"v\"}"));
+    let result = import_at(&target, &with).unwrap();
+    assert_eq!(result.summary.settings, None);
+    let conn = schema::open(&target).unwrap();
+    let left: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE name = 'english_studio_settings'", [], |r| r.get(0)).unwrap();
+    assert_eq!(left, 0);
+    drop(conn);
+    import_at(&target, &plain).unwrap();
   }
 
   /// 071：整库导入后，同步状态作废（cursor、首次标记、别人的账本），所有行重新记成待推送。

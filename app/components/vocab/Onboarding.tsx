@@ -12,6 +12,7 @@ import {
 import { markOnboardingDone, onOpenOnboarding, saveLevelResult, shouldAutoShow, type OnboardingStep, type OpenRequest } from '../../utils/vocab/onboarding';
 import { refreshPlan } from '../../utils/vocab/dailyPlanSync';
 import { wordpackBand, wordpackList, type WordpackEntry } from '../../utils/wordpack';
+import { requestSyncJoin } from '../SyncStatus';
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const chip = (on: boolean) => `press min-h-[44px] rounded-full border px-4 text-sm ${on ? 'border-ink bg-ink text-white' : 'border-line bg-page text-ink'}`;
@@ -243,6 +244,12 @@ export default function OnboardingHost({ onFinished }: { onFinished?: () => void
             : <span className="text-xs text-mute" data-testid="onboarding-step">第 {stepNo} / 3 步</span>}
           <button type="button" onClick={() => void leave()} data-testid="onboarding-close" aria-label="先不做" className="press -mr-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute"><X size={20} /></button>
         </div>
+        {step === 'goal' && !single && (
+          <button type="button" data-testid="onboarding-find-sync" onClick={() => { close(false); requestSyncJoin(); }}
+            className="press mb-3 block w-full min-w-0 break-words rounded-lg bg-shade px-3 py-2 text-left text-sm leading-6 text-mute hover:text-ink">
+            以前用过词滴？输入同步加入码，把词库找回来
+          </button>
+        )}
         <h1 className="text-xl font-semibold text-ink" data-testid="onboarding-title">{title}</h1>
 
         {step === 'goal' && (

@@ -17,13 +17,16 @@ export default function SettingsTransfer() {
   const [busy, setBusy] = useState<'export' | 'pick' | 'import' | null>(null);
   const [candidate, setCandidate] = useState<LibraryCandidate | null>(null);
   const [exported, setExported] = useState<LibraryExportResult | null>(null);
+  const [withSettings, setWithSettings] = useState(true);
+  const [includeApiKey, setIncludeApiKey] = useState(false);
+  const [restoreSettings, setRestoreSettings] = useState(true);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
   const doExport = async () => {
     setBusy('export'); setError(''); setNotice(''); setExported(null);
     try {
-      const result = await exportWholeLibrary();
+      const result = await exportWholeLibrary({ withSettings, includeApiKey: withSettings && includeApiKey });
       if (result) setExported(result);
       else setNotice('已取消保存，没有写出文件。');
     } catch (reason) { setError(`导出失败：${errorText(reason)}`); }
@@ -44,9 +47,9 @@ export default function SettingsTransfer() {
     if (!candidate) return;
     setBusy('import'); setError('');
     try {
-      const result = await importWholeLibrary(candidate.data);
+      const result = await importWholeLibrary(candidate.data, candidate.summary.settings && restoreSettings ? candidate.summary.settings : null);
       setCandidate(null);
-      setNotice(`搬家完成：${result.summary.words} 个词条已入库。${result.backupPath ? '导入前的本机词库已自动备份。' : ''}`);
+      setNotice(`搬家完成：${result.summary.words} 个词条已入库。${result.backupPath ? '导入前的本机词库已自动备份。' : ''}${result.settingsRestored ? `已恢复 ${result.settingsRestored} 项设置，部分设置重启应用后生效。` : ''}`);
     } catch (reason) { setError(errorText(reason)); }
     finally { setBusy(null); }
   };
@@ -62,6 +65,15 @@ export default function SettingsTransfer() {
           <div className="rounded-xl bg-shade p-4">
             <h3 className="text-sm font-medium text-ink">从这台设备导出</h3>
             <p className="mt-1 min-h-10 text-xs leading-5 text-mute">先做一个完整、一致的 SQLite 副本，再选保存位置。</p>
+            <label className="mt-2 flex items-start gap-2 text-xs leading-5 text-ink">
+              <input type="checkbox" checked={withSettings} onChange={e => setWithSettings(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-accent" data-testid="library-export-settings" />
+              <span className="min-w-0 break-words">同时导出设置</span>
+            </label>
+            <label className={`mt-1 flex items-start gap-2 text-xs leading-5 ${withSettings ? 'text-ink' : 'text-mute'}`}>
+              <input type="checkbox" checked={includeApiKey} disabled={!withSettings} onChange={e => setIncludeApiKey(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-accent" data-testid="library-export-apikey" />
+              <span className="min-w-0 break-words">包含 API key</span>
+            </label>
+            {withSettings && includeApiKey && <p className="mt-1 text-xs leading-5 text-danger" data-testid="library-export-apikey-warn">文件里会有你的密钥，别发给别人。</p>}
             <Btn tone="ink" className="mt-3 w-full" disabled={busy !== null} onClick={() => void doExport()} data-testid="library-export">
               {busy === 'export' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}导出整个词库
             </Btn>
@@ -74,7 +86,7 @@ export default function SettingsTransfer() {
             </Btn>
           </div>
         </div>
-        <p className="text-xs leading-5 text-mute">不搬设置、界面偏好、AI 密钥、视频和本地词典；这些不属于 vocab.db。</p>
+        <p className="text-xs leading-5 text-mute">设置（AI、词典来源、Anki 等）可选一起带走，API key 默认不带，同步密钥永远不带；视频和本地词典不搬。</p>
         {exported && <p role="status" className="break-all rounded-lg bg-accent-soft p-3 text-xs text-accent" data-testid="library-export-result">已导出 {exported.path}（{(exported.bytes / 1024).toFixed(1)} KB）</p>}
         {notice && <p role="status" className="rounded-lg bg-accent-soft p-3 text-sm text-accent" data-testid="library-import-result">{notice}</p>}
         {error && <p role="alert" className="whitespace-pre-wrap rounded-lg bg-danger-soft p-3 text-sm text-danger">{error}</p>}
@@ -97,6 +109,12 @@ export default function SettingsTransfer() {
               ].map(([label, value]) => <div key={label} className="rounded-xl bg-shade p-3"><dt className="text-xs text-mute">{label}</dt><dd className="mt-1 text-xl font-semibold tabular-nums text-ink">{value} 条</dd></div>)}
             </dl>
             <p className="mt-3 text-xs text-mute">导出时间：{dateText(candidate.summary.exportedAt)}</p>
+            {candidate.summary.settings && (
+              <label className="mt-3 flex items-start gap-2 text-sm leading-6 text-ink">
+                <input type="checkbox" checked={restoreSettings} onChange={e => setRestoreSettings(e.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-accent" data-testid="library-restore-settings" />
+                <span className="min-w-0 break-words">文件里带了设置，同时恢复（没带 API key 时，本机现有的 key 不会被清掉）</span>
+              </label>
+            )}
             <div className="mt-4 flex gap-2 rounded-xl border border-clay/30 bg-clay-soft p-3 text-sm leading-6 text-clay">
               <ShieldCheck size={19} className="mt-0.5 shrink-0" />
               <p><strong>会覆盖本机现在的词库。</strong>确认后，本机词库会先自动备份（最多保留最近 3 份），再换成文件里的内容。</p>

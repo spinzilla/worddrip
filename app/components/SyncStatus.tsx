@@ -5,6 +5,11 @@ const GOTO = 'es-goto-sync-settings';
 let pendingTab = false;
 /** 设置页打开时问一声：是不是从「同步失败」提示点进来的。 */
 export const consumeSyncTabRequest = (): boolean => { const v = pendingTab; pendingTab = false; return v; };
+let pendingJoin = false;
+/** 083：新装引导里点「输入同步加入码」→ 进同步设置并直接展开「加入」输入框。 */
+export const requestSyncJoin = () => { pendingTab = true; pendingJoin = true; window.dispatchEvent(new Event(GOTO)); };
+export const peekSyncJoinRequest = (): boolean => pendingJoin;
+export const clearSyncJoinRequest = () => { pendingJoin = false; };
 export const onGotoSyncSettings = (fn: () => void): (() => void) => { window.addEventListener(GOTO, fn); return () => window.removeEventListener(GOTO, fn); };
 
 /** 导航「设置」旁的小圆点：同步中（呼吸）/ 正常（绿）/ 失败（红）；没开同步不显示。 */

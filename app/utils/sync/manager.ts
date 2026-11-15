@@ -165,6 +165,16 @@ export async function runSync(): Promise<boolean> {
   return true;
 }
 
+/** 083：安装更新前把本机改动推一次。别的同步正在跑就先等它结束（最多 60 秒），再自己跑一次，确保推的是最新。 */
+export async function syncBeforeInstall(): Promise<boolean> {
+  const c = getSyncConfig();
+  if (!c) return false;
+  const deadline = Date.now() + 60_000;
+  while (state.phase === 'running' && Date.now() < deadline) await new Promise(r => setTimeout(r, 200));
+  if (state.phase === 'running') return false;
+  return runSync();
+}
+
 export async function refreshInfo(): Promise<void> {
   const c = getSyncConfig();
   if (!c || !syncAvailable()) return;

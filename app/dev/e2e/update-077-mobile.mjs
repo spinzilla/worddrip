@@ -30,7 +30,7 @@ try {
   const page = await ctx.newPage();
   page.setDefaultTimeout(20000);
   const out = f => path.join(t.out, f);
-  const flags = `localStorage.setItem('worddrip.update.base','${srv.base}'); localStorage.setItem('worddrip.update.dryRun','1');`;
+  const flags = `localStorage.setItem('worddrip_onboarding','done'); localStorage.setItem('worddrip.update.base','${srv.base}'); localStorage.setItem('worddrip.update.dryRun','1');`;
   await page.goto(t.url);
   await page.evaluate(flags);
   await page.reload();
@@ -43,8 +43,11 @@ try {
   await page.getByTestId('update-banner').waitFor();
   await page.screenshot({ path: out('banner-mobile.png') });
   ok('手机提示条：' + (await page.getByTestId('update-banner').innerText()).replace(/\s+/g, ' '));
-  await page.getByRole('button', { name: '更新内容' }).click();
-  await page.getByTestId('update-notes').waitFor();
+  // 测试版清单可能没有更新说明（按钮就不显示），有才点
+  if (await page.getByRole('button', { name: '更新内容' }).count()) {
+    await page.getByRole('button', { name: '更新内容' }).click();
+    await page.getByTestId('update-notes').waitFor();
+  }
   await page.screenshot({ path: out('banner-mobile-notes.png') });
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (await overflow()) throw new Error('390 宽横向溢出');
