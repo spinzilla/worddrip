@@ -8,6 +8,7 @@ import { statusLabel } from '../../utils/vocab/library';
 import type { FlashState } from '../../utils/vocab/flashcards';
 import { prepareRecallRound, surfaceKey, surfaceOf } from '../../utils/vocab/recall';
 import type { RecallQuestion, RecallRound } from '../../utils/vocab/recall';
+import { consumePendingRecallQuestion, prepareCachedRecallRound } from '../../utils/vocab/recallCache';
 import { hasQuestionModel, requestModelQuestions, requestUsageTasks, usageMixEnabled } from '../../utils/vocab/recallModel';
 import type { BrowseReviewWord } from '../../utils/vocab/types';
 import Flashcards from './Flashcards';
@@ -39,7 +40,7 @@ export default function DuePanel({ refreshKey, startRequest = 0 }: Props) {
   const [session, setSession] = useState<FlashState | null>(null);
   const [recallRound, setRecallRound] = useState<RecallRound | null>(null);
   const [recallError, setRecallError] = useState('');
-  /** 每次开始/退出都换号；退出后才回来的出题结果直接丢掉。 */
+  /** 只控制界面显示；退出后才回来的题照样由缓存工具保存。 */
   const recallTokenRef = useRef(0);
   const [recallBefore, setRecallBefore] = useState<Record<string, { status: string; due: string }>>({});
   const [recallModelOn, setRecallModelOn] = useState(false);
@@ -118,7 +119,7 @@ export default function DuePanel({ refreshKey, startRequest = 0 }: Props) {
         const exclude = new Set(flagged.map(entry => surfaceKey(entry.wordId, entry.detail)));
         flaggedRef.current = exclude;
         // 038：首轮混入改写/造句题（没配模型时只出填空并说明原因）；复检仍只出填空。
-        return prepareRecallRound(queue, { generate, exclude, mix: usageMixEnabled(), generateUsage: modelOn ? requestUsageTasks : null });
+        return prepareCachedRecallRound(queue, { generate, exclude, mix: usageMixEnabled(), generateUsage: modelOn ? requestUsageTasks : null });
       })
       .then(round => {
         if (recallTokenRef.current === token) setRecallRound(round);
@@ -244,6 +245,7 @@ export default function DuePanel({ refreshKey, startRequest = 0 }: Props) {
           modelOn={recallModelOn}
           before={recallBefore}
           makeRecheck={makeRecheck}
+          onQuestionConsumed={consumePendingRecallQuestion}
           onExit={exit}
         />
       )}

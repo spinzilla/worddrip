@@ -11,6 +11,9 @@ import App from './App';
 import RestoreFailed from './components/RestoreFailed';
 import { afterStart, bootRestore } from './utils/restore';
 import { initSettingsBackup } from './utils/settingsBackup';
+import { applyFontScale } from './utils/fontScale';
+
+applyFontScale(); // 字号在第一次渲染前套上，免得闪一下
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

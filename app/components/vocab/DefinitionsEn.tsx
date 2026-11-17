@@ -198,6 +198,7 @@ export function ExtraDefinitionsEn({ word, stored, imported, loaded = true }: {
 
   return (
     <div className="mt-3" data-testid="def-en-extra">
+      {!view.empty && <p className="mb-1.5 text-[11px] leading-4 text-mute" data-testid="def-en-lookup-hint">点单词可查中文释义</p>}
       {view.dict.length > 0 && (view.dictCollapsed ? (
         <div>
           <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} className={btn} data-testid="def-en-dict-toggle">
@@ -256,6 +257,7 @@ export function FlashDefinitionsEn({ word, stored, imported, loaded, children }:
   if (view.mine.length === 0 && view.dict.length === 0 && !children) return null;
   return (
     <div data-testid="flash-def-en">
+      {!view.empty && <p className="mb-1.5 text-[11px] leading-4 text-mute" data-testid="flash-def-en-lookup-hint">点单词可查中文释义</p>}
       {view.mine.length > 0 && <ol className="vocab-flash-defs">{view.mine.map(row)}</ol>}
       {children}
       {view.dict.length > 0 && (view.dictCollapsed ? (

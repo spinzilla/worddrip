@@ -14,6 +14,7 @@ await build({
     contents: [
       "export * from './utils/vocab/definitionEn.ts';",
       "export * from './utils/vocab/definitionJob.ts';",
+      "export * from './utils/vocab/definitionEnOnline.ts';",
     ].join('\n'),
     resolveDir: process.cwd(),
     loader: 'ts',
@@ -56,6 +57,7 @@ const entry = (senses, source = 'cambridgeEn') => ({ word: 'w', phonetic: '', so
   const grouped = d.groupDefinitions([row(5, 'dict:cambridge', 'a'), row(4, 'mine', 'b')]);
   assert.deepEqual(grouped.get('resilient').map(x => x.id), [4, 5], '同一个词里我写的排第一');
   assert.equal(d.sourceLabel('mine'), '我写的');
+  assert.equal(d.sourceLabel('dict:youdao'), '来自 有道（WordNet）');
   assert.equal(d.sourceLabel('dict:cambridge'), '来自 剑桥英英');
   assert.equal(d.sourceLabel('dict:wiktionary'), '来自 Wiktionary');
 }
@@ -78,6 +80,31 @@ const entry = (senses, source = 'cambridgeEn') => ({ word: 'w', phonetic: '', so
   assert.equal(await d.findDictDefinitions('zzz', async () => null), null);
   assert.equal(await d.findDictDefinitions('zzz', async () => { throw new Error('offline'); }), null, '断网不抛错');
   assert.equal(await d.findDictDefinitions('zzz', async () => ({ entries: [entry([['n.', '中文']])], source: 'dict:cambridge', online: true })), null, '没有英文义项不写空记录');
+}
+
+// ---- 在线来源：有道优先，失败/查不到逐个换，全部失败才算查不到 ----
+{
+  assert.deepEqual(d.onlineSourceOrder('cambridgeEn'), ['youdao', 'cambridgeEn', 'wiktionary']);
+  assert.deepEqual(d.onlineSourceOrder('wiktionary'), ['youdao', 'wiktionary', 'cambridgeEn']);
+  const calls = [];
+  let waits = 0;
+  const hit = await d.findOnlineDefinition('agenda', 'cambridgeEn', async source => {
+    calls.push(source);
+    if (source === 'youdao') throw new Error('youdao down');
+    if (source === 'cambridgeEn') return [entry([['n.', 'a plan']])];
+    return null;
+  }, async () => { waits += 1; });
+  assert.deepEqual(calls, ['youdao', 'cambridgeEn'], '有道报错后换剑桥，不再请求第三个');
+  assert.equal(waits, 2, '每次真实请求前都限速');
+  assert.equal(hit.source, 'dict:cambridge');
+  const missingCalls = [];
+  const missing = await d.findOnlineDefinition('zzz', 'wiktionary', async source => {
+    missingCalls.push(source);
+    if (source === 'youdao') return [];
+    throw new Error('offline');
+  }, async () => {});
+  assert.equal(missing, null);
+  assert.deepEqual(missingCalls, ['youdao', 'wiktionary', 'cambridgeEn']);
 }
 
 // ---- 一键补全 ----
@@ -112,7 +139,8 @@ const makeDeps = (have = new Set()) => {
   assert.equal(s.found, 14);
   assert.equal(s.missing, 4);
   assert.ok(!h.queried.includes('word0') && !h.queried.includes('word1'), '跳过的词不去查词典');
-  assert.equal(d.jobReport(s), '补了 14 个，查不到 4 个');
+  assert.deepEqual(s.bySource, { 'dict:wiktionary': 14 });
+  assert.equal(d.jobReport(s), '补了 14 个（Wiktionary 14），查不到 4 个');
   assert.ok(seen.includes(9), '进度逐步推进');
   assert.ok(h.saved.every(([, source]) => source === 'dict:wiktionary'));
   job.dismiss();

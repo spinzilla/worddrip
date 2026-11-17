@@ -8,6 +8,7 @@
  */
 import { build } from 'esbuild';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,7 +17,7 @@ Object.defineProperty(globalThis, 'navigator', { value: { language: 'en-US' } })
 
 const out = join(tmpdir(), `dictionary-${process.pid}.mjs`);
 await build({ entryPoints: ['utils/dictionary.ts'], bundle: true, format: 'esm', outfile: out });
-const { detectLang, parseYoudao, parseYoudaoJa, pickEudicTerms, senseToAnki, senseList, getDictChoice, saveDictChoice, dictOptions } = await loadFile(out);
+const { detectLang, parseYoudao, parseYoudaoEnglish, parseYoudaoJa, pickEudicTerms, senseToAnki, senseList, getDictChoice, saveDictChoice, dictOptions } = await loadFile(out);
 const enOut = join(tmpdir(), `dictionaryEn-${process.pid}.mjs`);
 await build({ entryPoints: ['utils/dictionaryEn.ts'], bundle: true, format: 'esm', outfile: enOut });
 const { parseWiktionary, parseJisho, htmlText } = await loadFile(enOut);
@@ -50,6 +51,21 @@ assert.equal(running.phonetic, '/ˈrʌnɪŋ/');
 assert.equal(running.source, 'youdao');
 assert.deepEqual(running.senses.map(s => s.pos), ['n.', 'v.', '']);
 assert.deepEqual(running.senses[1].text, ['跑；运转（run的现在分词形式）']);
+
+// --- Youdao: English-English `ee` (trimmed real agenda response, 2026-11-17) ---
+const agendaBody = JSON.parse(fs.readFileSync('dev/fixtures/vocab/definition-en/youdao-agenda.json', 'utf8'));
+const agenda = parseYoudaoEnglish(agendaBody, 'agenda');
+assert.equal(agenda.source, 'youdao');
+assert.equal(agendaBody.ee.source.name, 'WordNet');
+assert.deepEqual(agenda.senses.map(s => [s.pos, s.text[0]]), [
+  ['n.', 'a temporally organized plan for matters to be attended to'],
+  ['n.', 'a list of matters to be taken up (as at a meeting)'],
+]);
+assert.equal(parseYoudaoEnglish({ ec: { word: { trs: [] } } }, 'agenda'), null, '没有 ee');
+assert.equal(parseYoudaoEnglish({ ee: { word: { trs: 'bad' } } }, 'agenda'), null, 'ee.trs 不是数组');
+assert.equal(parseYoudaoEnglish({ ee: { word: { trs: [{ pos: ['n.'], tr: [{ tran: 42 }] }] } } }, 'agenda'), null, '义项格式不对');
+const four = parseYoudaoEnglish({ ee: { word: { trs: [{ pos: 'n.', tr: [1, 2, 3, 4].map(n => ({ tran: `meaning ${n}` })) }] } } }, 'x');
+assert.equal(four.senses.length, 3, '最多取 3 条');
 
 // --- Youdao: French `fc` (lemma comes back for a conjugated form) ---
 const parlons = parseYoudao({ fc: { word: [{

@@ -1,19 +1,19 @@
 // 078 英英释义：真实的查词典（本地英英词典优先，否则在线）、限速、存库、自动补全单词。
 // 纯逻辑在 definitionEn.ts / definitionJob.ts；这里只接真实的词典和词库接口。
-import { fromSource, getDictChoice, getDictSources } from '../dictionary';
-import type { DictEntry } from '../dictionary';
+import { fromSource, getDictChoice, getDictSources, lookupYoudaoEnglish } from '../dictionary';
 import { localDictsFor, localDictsReady, lookupLocal } from '../localDict';
 import { vocabApi } from './api';
 import { ONLINE_MIN_INTERVAL_MS, definitionKey, findDictDefinitions, notifyDefinitionsChanged } from './definitionEn';
 import type { DictFinder, DictFound } from './definitionEn';
 import { createDefinitionJob, createThrottle } from './definitionJob';
+import { findOnlineDefinition } from './definitionEnOnline';
 
 
 export const throttleOnline = createThrottle(ONLINE_MIN_INTERVAL_MS);
 
 const localSource = (dictName: string | undefined) => (/wiktionary|wty/i.test(dictName ?? '') ? 'dict:local-wiktionary' : 'dict:local');
 
-/** 本地英英词典 → 在线（按查词设置里选的英英来源；选了有道这种中文的就用剑桥英英）。 */
+/** 本地英英词典 → 有道 → 用户选的在线英英来源 → 另一个。 */
 export const defaultFinder: DictFinder = async word => {
   // 仅开发/真实窗口测试：用测试替身代替真实词典（不打真实网站）。正式包里 import.meta.env.DEV 为 false，这段不会生效。
   const stub = import.meta.env.DEV ? (window as unknown as { __ES_E2E_DICT__?: DictFinder }).__ES_E2E_DICT__ : undefined;
@@ -25,11 +25,10 @@ export const defaultFinder: DictFinder = async word => {
     if (entries?.length) return { entries, source: localSource(entries[0].dictName), online: false };
   }
   if (!online) return null;
-  const choice = getDictChoice().en;
-  const source = choice === 'wiktionary' ? 'wiktionary' : 'cambridgeEn';
-  await throttleOnline();
-  const entries: DictEntry[] | null = await fromSource(source, word, 'en');
-  return entries?.length ? { entries, source: source === 'wiktionary' ? 'dict:wiktionary' : 'dict:cambridge', online: true } : null;
+  return findOnlineDefinition(word, getDictChoice().en, async (source, text) => {
+    if (source === 'youdao') return lookupYoudaoEnglish(text);
+    return fromSource(source, text, 'en');
+  }, throttleOnline);
 };
 
 /** 把查到的存进词库（词典来的重复由后端跳过），并通知界面重读。 */

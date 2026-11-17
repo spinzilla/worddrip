@@ -109,4 +109,16 @@ assert.deepEqual(await run({ hasSync: true, syncOk: false, confirm: true }), { r
 assert.deepEqual(await run({ hasSync: true, syncOk: false, confirm: false }), { r: false, calls: ['snap', 'sync', 'confirm'] });
 assert.deepEqual(await run({ hasSync: false }), { r: true, calls: ['snap'] }, '没加入同步：不拦');
 
+// 字号（088）：键在设置清单里，快照能带上；存的值坏了就回到「标准」
+assert.ok(L.isSettingsKey('linguaclip_font_scale'), '字号键在设置清单');
+assert.equal(L.takeSnapshot(new Mem({ linguaclip_font_scale: 'large' }), '1', 1).items.linguaclip_font_scale, 'large');
+const F = await load('utils/fontScale.ts', 'fontScale.mjs');
+globalThis.localStorage = new Mem({ linguaclip_font_scale: 'xlarge' });
+assert.equal(F.getFontScale(), 'xlarge');
+globalThis.localStorage = new Mem({ linguaclip_font_scale: 'huge' });
+assert.equal(F.getFontScale(), 'normal', '坏值回到标准');
+globalThis.localStorage = new Mem();
+assert.equal(F.getFontScale(), 'normal', '没存过是标准');
+delete globalThis.localStorage;
+
 console.log('test-settings-backup ok');

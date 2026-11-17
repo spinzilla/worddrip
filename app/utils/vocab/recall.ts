@@ -544,6 +544,11 @@ export interface PrepareOptions {
   mix?: boolean;
   /** 改写/造句出题；没配模型传 null。 */
   generateUsage?: UsageGenerator | null;
+  /**
+   * 084 待做题缓存：这些词已有可用的题（按词条 ID 给），照常占位、不请求模型，也不参与改写/造句分配。
+   * 其余行为和没有缓存时完全一样。
+   */
+  known?: ReadonlyMap<string, RecallQuestion>;
 }
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -562,16 +567,21 @@ export const USAGE_NO_MODEL = '没配置模型：这一轮只出看释义填空�
 export async function prepareRecallRound(queue: readonly QuestionWord[], options: PrepareOptions): Promise<RecallRound> {
   const limit = options.limit ?? RECALL_LIMIT;
   const modelOn = options.generate !== null;
-  const slots: { word: QuestionWord; question: RecallQuestion | null; wantModel: boolean; usage: UsageFormat | null; fill: RecallQuestion | null }[] = [];
+  const slots: { word: QuestionWord; question: RecallQuestion | null; wantModel: boolean; usage: UsageFormat | null; fill: RecallQuestion | null; cached: boolean }[] = [];
   const skipped: SkippedWord[] = [];
   let consumed = 0;
 
   for (const word of queue) {
     if (slots.length >= limit) break;
     consumed += 1;
+    const known = options.known?.get(word.id);
+    if (known) {
+      slots.push({ word, question: known, wantModel: false, usage: null, fill: null, cached: true });
+      continue;
+    }
     const fromExample = exampleQuestion(word, options.exclude);
     if (fromExample) {
-      slots.push({ word, question: fromExample, wantModel: false, usage: null, fill: null });
+      slots.push({ word, question: fromExample, wantModel: false, usage: null, fill: null, cached: false });
       continue;
     }
     const sentence = recallKind(word.word) === 'sentence';
@@ -581,15 +591,17 @@ export async function prepareRecallRound(queue: readonly QuestionWord[], options
       skipped.push({ wordId: word.id, word: word.word, reason: sentence ? SENTENCE_NO_DEF : NO_DEF_NO_MODEL });
       continue;
     }
-    slots.push({ word, question: wantModel ? null : fallback, wantModel, usage: null, fill: null });
+    slots.push({ word, question: wantModel ? null : fallback, wantModel, usage: null, fill: null, cached: false });
   }
 
   const notices: string[] = [];
   const usageOn = options.mix === true && modelOn && Boolean(options.generateUsage);
   if (options.mix === true && !usageOn) notices.push(USAGE_NO_MODEL);
   if (usageOn) {
-    const eligible = slots.filter(slot => usageEligible(slot.word));
-    for (const [position, format] of pickUsageSlots(eligible.length, usageCount(slots.length))) eligible[position].usage = format;
+    // 改写/造句的份额只按这一轮新出的题算，缓存题不参与。
+    const fresh = slots.filter(slot => !slot.cached);
+    const eligible = fresh.filter(slot => usageEligible(slot.word));
+    for (const [position, format] of pickUsageSlots(eligible.length, usageCount(fresh.length))) eligible[position].usage = format;
   }
   const usageSlots = slots.filter(slot => slot.usage !== null);
   // 填空出题和改写/造句出题同时发；改写/造句失败的词退回它的填空题（现成例句、模型语境句或仅释义）。

@@ -52,7 +52,9 @@ export default defineConfig(({ command }) => {
       appType: browserDev ? 'mpa' : 'spa',
       server: {
         // tauri dev expects 3000; a browser preview takes the port it is handed.
-        port: browserDev && process.env.PORT ? Number(process.env.PORT) : 3000,
+        port: process.env.ES_E2E_DEV_PORT
+          ? Number(process.env.ES_E2E_DEV_PORT)
+          : browserDev && process.env.PORT ? Number(process.env.PORT) : 3000,
         host: browserDev ? '127.0.0.1' : '0.0.0.0',
         // Windows: cargo writes target/*.exe while vite watches the project root;
         // chokidar then dies with EBUSY on the locked binary and takes dev down.

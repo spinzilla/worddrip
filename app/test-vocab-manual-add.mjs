@@ -83,9 +83,11 @@ const recall = fs.readFileSync('components/vocab/RecallReview.tsx', 'utf8');
 assert.match(recall, /const addSource = phase === 'write' \|\| lookupTargets\.length > 0 \? undefined/, '复习/首考作答中不能给「加入词库」');
 const lookable = fs.readFileSync('components/Lookable.tsx', 'utf8');
 assert.match(lookable, /vocab=\{addSource && !guarded \?/, '防泄题（targets 非空）时 Lookable 不给「加入词库」');
-for (const [file, source] of [['components/Studio.tsx', '精听'], ['components/WatchPage.tsx', '看剧'], ['components/coach/CoachPage.tsx', '教练'], ['components/vocab/VocabPage.tsx', '词库']]) {
+for (const [file, source] of [['components/Studio.tsx', '精听'], ['components/WatchPage.tsx', '看剧'], ['pro/ListenPage.tsx', '精听'], ['pro/ReaderPage.tsx', '阅读'], ['components/coach/CoachPage.tsx', '教练'], ['components/vocab/VocabPage.tsx', '词库'], ['components/vocab/Flashcards.tsx', '词库']]) {
   assert.ok(fs.readFileSync(file, 'utf8').includes(source), `${file} 的查词卡要写来源「${source}」`);
 }
+const panel = fs.readFileSync('components/DefinitionPanel.tsx', 'utf8');
+assert.match(panel, /useInVocabMatch\(\[def\.word, headword\]/, '「已在词库」按点击词和词典原形查，点开时用命中的写法');
 
 fs.rmSync(bundled, { force: true });
 console.log('test-vocab-manual-add: 全部通过');

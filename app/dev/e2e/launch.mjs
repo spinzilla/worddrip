@@ -16,7 +16,7 @@ import { createdBefore, descendantsOf, portInUse, sleep, snapshot } from './proc
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const APP_DIR = path.resolve(here, '..', '..'); // 仓库的 app 目录
 export const E2E_ROOT = process.env.ES_E2E_ROOT || 'D:\\tmp\\es-e2e';
-export const DEV_PORT = 3000; // tauri.conf.json 的 devUrl
+export const DEV_PORT = Number(process.env.ES_E2E_DEV_PORT) || 3000; // tauri.conf.json 的 devUrl；默认值不变
 const log = (...a) => console.log('[launch]', ...a);
 // 默认测试窗口不显示、不抢焦点、不进任务栏，免得验收时弹到用户面前。
 // 想亲眼看窗口：设环境变量 ES_E2E_SHOW_WINDOW=1。截图和点击都走 CDP，窗口隐藏也照常工作（2026-11-10 实测）。
@@ -26,9 +26,14 @@ const SHOW_WINDOW = process.env.ES_E2E_SHOW_WINDOW === '1';
 // 生成 tauri dev --config 用的覆盖文件。windows 是数组，合并时整段替换，所以从 tauri.conf.json 复制完整窗口对象再改。
 function hiddenWindowConfig(p) {
   const conf = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'src-tauri', 'tauri.conf.json'), 'utf8'));
-  const windows = (conf.app?.windows || []).map(w => ({ ...w, visible: false, focus: false, skipTaskbar: true }));
+  const windows = (conf.app?.windows || []).map(w => SHOW_WINDOW
+    ? { ...w }
+    : { ...w, visible: false, focus: false, skipTaskbar: true });
   const file = path.join(p.runDir, 'tauri-e2e-window.json');
-  fs.writeFileSync(file, JSON.stringify({ app: { windows } }, null, 2));
+  fs.writeFileSync(file, JSON.stringify({
+    build: { devUrl: `http://localhost:${DEV_PORT}` },
+    app: { windows },
+  }, null, 2));
   return file;
 }
 
@@ -138,7 +143,7 @@ export async function start({ port = 9337, runId, runDir, timeoutMs = Number(pro
 
   const logFile = path.join(p.logs, 'tauri-dev.log');
   const fd = fs.openSync(logFile, 'a');
-  const devArgs = SHOW_WINDOW ? [] : ['--config', hiddenWindowConfig(p)];
+  const devArgs = ['--config', hiddenWindowConfig(p)];
   // 077：ES_E2E_EXTRA_CONFIG 指向一个 tauri 配置覆盖文件（例如把更新清单地址指到本机）；没设时和以前一样。
   if (process.env.ES_E2E_EXTRA_CONFIG) devArgs.push('--config', process.env.ES_E2E_EXTRA_CONFIG);
   const child = spawn(process.execPath, [tauriJs, 'dev', ...devArgs], {

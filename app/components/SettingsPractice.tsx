@@ -9,7 +9,7 @@ interface SettingsPracticeProps {
   setSectionLength: (value: number) => void;
 }
 
-// Settings → Practice: how a video is cut into sections, intensive listening's hard-line plays, Japanese splitting, and the home screen's week.
+// Settings → Practice: how a video is cut into sections, intensive listening's hard-line plays, Japanese splitting, and the home screen's week. (Text size lives on the Look up tab.)
 const SettingsPractice: React.FC<SettingsPracticeProps> = ({
   sectionLength,
   setSectionLength,

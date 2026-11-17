@@ -17,7 +17,7 @@ export interface KV {
 //   学习计划缓存  worddrip_daily_plan、worddrip_daily_state
 //   首次引导      worddrip_onboarding、worddrip_level_result
 //   界面/练习     linguaclip_lang、linguaclip_practice_config、linguaclip_audio_padding、linguaclip_watch_prefs、linguaclip_loop（句循环）、
-//                 linguaclip_keys、linguaclip_keys_pinned、linguaclip_deck_lang、import_lang、import_trash_original
+//                 linguaclip_keys、linguaclip_keys_pinned、linguaclip_deck_lang、import_lang、import_trash_original、linguaclip_font_scale（字号）
 //   转写 / Notion linguaclip_transcribe_config（含云端 key）、linguaclip_notion_config（含 token）
 //   授权          linguaclip_pro_license
 //   更新          worddrip.update.auto
@@ -29,7 +29,7 @@ export const SETTINGS_KEYS: readonly string[] = [
   'worddrip_daily_plan', 'worddrip_daily_state',
   'worddrip_onboarding', 'worddrip_level_result',
   'linguaclip_lang', 'linguaclip_practice_config', 'linguaclip_audio_padding', 'linguaclip_watch_prefs', 'linguaclip_loop',
-  'linguaclip_keys', 'linguaclip_keys_pinned', 'linguaclip_deck_lang', 'import_lang', 'import_trash_original',
+  'linguaclip_keys', 'linguaclip_keys_pinned', 'linguaclip_deck_lang', 'import_lang', 'import_trash_original', 'linguaclip_font_scale',
   'linguaclip_transcribe_config', 'linguaclip_notion_config',
   'linguaclip_pro_license',
   'worddrip.update.auto',

@@ -15,6 +15,9 @@ import { RestoreFailed } from './RestoreFailed';
 import { bootRestore } from './restore';
 import { PENDING_KEY } from '../utils/backup';
 import { t } from '../utils/i18n';
+import { applyFontScale } from '../utils/fontScale';
+
+applyFontScale(); // 字号在第一次渲染前套上，免得闪一下
 
 // Another window started or ended a restore: this one stops writing and starts over.
 window.addEventListener('storage', e => {

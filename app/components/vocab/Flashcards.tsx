@@ -24,7 +24,7 @@ import { FlashDefinitionsEn, useMyDefinitions } from './DefinitionsEn';
 import { definitionKey } from '../../utils/vocab/definitionEn';
 import SceneTag, { useExampleScenes } from './SceneTag';
 import VoiceButton from './VoiceButton';
-import { findWordAt } from '../Lookable';
+import Lookable, { findWordAt } from '../Lookable';
 import { exampleKey, sensesFrom } from '../../utils/vocab/examples';
 import { IS_MOBILE } from '../../utils/platform';
 import './vocab.css';
@@ -244,6 +244,7 @@ export default function Flashcards({ initial, onExit }: Props) {
   } : {};
 
   return (
+    <Lookable addSource="词库">
     <div className={`vocab-flash-overlay${IS_MOBILE ? ' vocab-flash-m' : ''}`} role="dialog" aria-modal="true" aria-label="到期复习闪卡" data-testid="flash">
       <div className="vocab-flash-inner vocab-flash-wide">
         <div className="flex items-center justify-between gap-3">
@@ -394,5 +395,6 @@ export default function Flashcards({ initial, onExit }: Props) {
         <p className="vocab-flash-foot mt-3 text-center text-xs text-mute">{IS_MOBILE ? '点卡片翻面，左右滑切换。' : '← → 切换 · 空格翻面 · Esc 退出。'}闪卡只用来回忆，不会改学习等级或到期日。</p>
       </div>
     </div>
+    </Lookable>
   );
 }

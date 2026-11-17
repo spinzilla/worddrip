@@ -21,6 +21,7 @@ import SettingsSync from './SettingsSync';
 import { consumeDailySettingsRequest } from '../utils/vocab/dailyWords';
 import { consumeSyncTabRequest } from './SyncStatus';
 import { IS_MOBILE, settingsTabs, SettingsTab } from '../utils/platform';
+import { FontScale, getFontScale, saveFontScale } from '../utils/fontScale';
 
 type DeckByLang = NonNullable<AnkiCardTemplateConfig['deckByLang']>;
 
@@ -68,6 +69,7 @@ const Settings: React.FC = () => {
   const [aiLimits, setAiLimits] = useState<NonNullable<AIConfig['limits']>>({});
 
   const [sectionLength, setSectionLength] = useState(Storage.DEFAULT_SECTION_LENGTH);
+  const [fontScale, setFontScaleState] = useState<FontScale>(getFontScale);
 
   const [tab, setTab] = useState<Tab>(consumeSyncTabRequest() ? 'transfer' : consumeDailySettingsRequest() ? 'cards' : settingsTabs(IS_MOBILE)[0]);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -187,7 +189,13 @@ const Settings: React.FC = () => {
       )}
 
       {tab === 'lookup' && (
-        <SettingsLookup onSaved={flashSaved} aiReady={AI.aiReady()} goAI={goAI}>
+        <SettingsLookup onSaved={flashSaved} aiReady={AI.aiReady()} goAI={goAI}
+          fontScale={fontScale}
+          setFontScale={(v) => {
+            setFontScaleState(v);
+            saveFontScale(v);
+            flashSaved();
+          }}>
           <AiPrompt
             aiReady={AI.aiReady() /* the same check word lookup makes: needs the main model */}
             goAI={goAI}

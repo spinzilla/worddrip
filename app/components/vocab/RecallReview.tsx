@@ -64,6 +64,8 @@ interface Props {
   before: Readonly<Record<string, { status: string; due: string }>>;
   /** 为答错的词换一个新语境的题；失败返回中文原因。 */
   makeRecheck: (wordId: string, usedSurface: string) => Promise<RecallQuestion | string>;
+  /** 首轮题判完或被标错后删掉待做缓存；复检题不走这里。 */
+  onQuestionConsumed?: (wordId: string) => void;
   onExit: () => void;
   /** review = 到期复习；first = 新词首考，首考可用 previewed 传预习标记。 */
   variant?: 'review' | 'first';
@@ -244,7 +246,7 @@ function GradeDetail({ grade, correct, written, answer, reference }: { grade: Gr
  * 提交一屏后先逐题判分（不写库），用户可以改判笔误、标「这题出错了」；
  * 点「保存并下一屏」时才把没标出错的题写回复习库。最后一屏之后给逐题结果表，答错的词可以换语境复检。
  */
-export default function RecallReview({ round, prepareError, modelOn, before, makeRecheck, onExit, variant = 'review', remaining, previewed }: Props) {
+export default function RecallReview({ round, prepareError, modelOn, before, makeRecheck, onQuestionConsumed, onExit, variant = 'review', remaining, previewed }: Props) {
   const firstTest = variant === 'first';
   const questions = round?.questions ?? [];
   const screens = useMemo(() => splitScreens(questions.map((_, index) => index)), [questions]);
@@ -377,6 +379,7 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
       if (state.flagged) return;
       patch(index, { grading: true });
       const outcome: Evaluation = await evaluateAnswer(questions[index], state.written, { modelOn, forgot: state.forgot });
+      onQuestionConsumed?.(questions[index].wordId);
       patch(index, { grading: false, grade: outcome.grade, correct: outcome.correct });
     }));
   };
@@ -645,7 +648,11 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
             {!locked && !state.flagLogged && !state.grading && (
               <button
                 type="button"
-                onClick={() => patch(index, { flagged: !state.flagged, forgot: writing ? false : state.forgot })}
+                onClick={() => {
+                  const flagged = !state.flagged;
+                  patch(index, { flagged, forgot: writing ? false : state.forgot });
+                  if (flagged) onQuestionConsumed?.(question.wordId);
+                }}
                 aria-pressed={state.flagged}
                 className="press inline-flex items-center gap-1.5 text-xs text-mute underline"
                 data-testid="recall-flag"

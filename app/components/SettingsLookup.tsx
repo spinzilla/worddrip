@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Btn, Card, Field, Seg } from './ui';
+import { Btn, Card, Field, Group, Seg } from './ui';
 import { useT, useLang } from '../utils/i18n';
 import { DictLang, DictSources, dictOptions, getDictChoice, getDictSources, saveDictChoice, saveDictSources } from '../utils/dictionary';
 import SettingsLocalDict from './SettingsLocalDict';
 import { IS_MOBILE } from '../utils/platform';
+import { FontScale } from '../utils/fontScale';
 
 type AutoMode = 'off' | 'many' | 'always';
 
@@ -23,7 +24,7 @@ const DictionaryPicker: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
           <div key={lang} className="flex items-start gap-3 sm:items-center sm:gap-4">
             <span className="w-[5.5rem] shrink-0 whitespace-nowrap pt-2 text-sm text-mute sm:w-20 sm:pt-0">{t(`dict.${lang}`)}</span>
             <Seg
-              className="min-w-0 flex-1 max-sm:!grid max-sm:grid-cols-2 sm:flex-none"
+              className="min-w-0 flex-1 max-sm:!flex max-sm:flex-wrap sm:flex-none"
               options={options[lang].map(v => ({ value: v, label: t(`dict.${v}`) }))}
               value={choice[lang]}
               onChange={v => { saveDictChoice(lang, v, ui); redraw(n => n + 1); onSaved(); }}
@@ -59,7 +60,10 @@ const Step: React.FC<{ n: number; title: string; sub: string; on?: boolean; setO
   );
 };
 
-const SettingsLookup: React.FC<{ onSaved: () => void; aiReady: boolean; goAI: () => void; children: React.ReactNode }> = ({ onSaved, aiReady, goAI, children }) => {
+const SettingsLookup: React.FC<{
+  onSaved: () => void; aiReady: boolean; goAI: () => void; children: React.ReactNode;
+  fontScale: FontScale; setFontScale: (value: FontScale) => void;
+}> = ({ onSaved, aiReady, goAI, children, fontScale, setFontScale }) => {
   const t = useT();
   const ui = useLang();
   const [src, setSrc] = useState<DictSources>(() => getDictSources(ui));
@@ -74,6 +78,22 @@ const SettingsLookup: React.FC<{ onSaved: () => void; aiReady: boolean; goAI: ()
 
   return (
     <div className="space-y-4">
+      {/* Top of the page, so phone users find it (the 练习 tab is desktop-only). */}
+      <Group title={t('settings.group.fontSize')}>
+        <Field label={t('settingsGeneral.fontSize')} hint={t('settingsGeneral.fontSizeHint')}>
+          <Seg<FontScale>
+            options={[
+              { value: 'small', label: t('settingsGeneral.fontSizeSmall') },
+              { value: 'normal', label: t('settingsGeneral.fontSizeNormal') },
+              { value: 'large', label: t('settingsGeneral.fontSizeLarge') },
+              { value: 'xlarge', label: t('settingsGeneral.fontSizeXlarge') },
+            ]}
+            value={fontScale}
+            onChange={setFontScale}
+            className="flex-wrap"
+          />
+        </Field>
+      </Group>
       <div className="flex items-center gap-4 flex-wrap">
         <p className="flex-1 text-sm text-mute">{[t('lookup.click'), ...flow].join(' → ')}</p>
         {/* Up here, not in a card: flipping it swaps the cards below, and it stays put under the mouse. */}

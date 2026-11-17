@@ -1,0 +1,33 @@
+{
+  "ee": {
+    "source": {
+      "name": "WordNet",
+      "url": "https://wordnet.princeton.edu"
+    },
+    "word": {
+      "trs": [
+        {
+          "pos": "n.",
+          "tr": [
+            {
+              "tran": "a temporally organized plan for matters to be attended to",
+              "similar-words": [
+                "docket",
+                "schedule"
+              ]
+            },
+            {
+              "tran": "a list of matters to be taken up (as at a meeting)",
+              "similar-words": [
+                "agendum",
+                "order of business"
+              ]
+            }
+          ]
+        }
+      ],
+      "speech": "agenda",
+      "return-phrase": "agenda"
+    }
+  }
+}

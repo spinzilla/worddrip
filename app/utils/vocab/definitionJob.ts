@@ -14,6 +14,8 @@ export interface DefinitionJobState {
   found: number;
   /** 查不到几个词。 */
   missing: number;
+  /** 补上的词按来源计数，结束后展示给用户。 */
+  bySource: Record<string, number>;
   cancelled: boolean;
   /** 跑完或取消后为 true；开新一轮时清掉。 */
   finished: boolean;
@@ -23,7 +25,7 @@ export interface DefinitionJobState {
 }
 
 export const emptyJobState = (): DefinitionJobState => ({
-  running: false, total: 0, done: 0, found: 0, missing: 0, cancelled: false, finished: false, current: '', error: '',
+  running: false, total: 0, done: 0, found: 0, missing: 0, bySource: {}, cancelled: false, finished: false, current: '', error: '',
 });
 
 export interface DefinitionJobDeps {
@@ -38,7 +40,12 @@ export interface DefinitionJobDeps {
 export function jobReport(state: DefinitionJobState): string {
   if (!state.finished) return '';
   const head = state.cancelled ? '已取消，' : '';
-  return `${head}补了 ${state.found} 个，查不到 ${state.missing} 个${state.cancelled ? `（还有 ${Math.max(0, state.total - state.done)} 个没处理，已补的保留）` : ''}`;
+  const names: Record<string, string> = {
+    'dict:youdao': '有道', 'dict:cambridge': '剑桥', 'dict:wiktionary': 'Wiktionary',
+    'dict:local': '本地词典', 'dict:local-wiktionary': '本地 Wiktionary',
+  };
+  const detail = Object.entries(state.bySource).map(([source, count]) => `${names[source] ?? source.replace(/^dict:/, '')} ${count}`).join('、');
+  return `${head}补了 ${state.found} 个${detail ? `（${detail}）` : ''}，查不到 ${state.missing} 个${state.cancelled ? `（还有 ${Math.max(0, state.total - state.done)} 个没处理，已补的保留）` : ''}`;
 }
 
 export function createDefinitionJob(deps: DefinitionJobDeps) {
@@ -71,7 +78,11 @@ export function createDefinitionJob(deps: DefinitionJobDeps) {
       if (found) {
         try {
           await deps.save(word, found);
-          set({ done: state.done + 1, found: state.found + 1 });
+          set({
+            done: state.done + 1,
+            found: state.found + 1,
+            bySource: { ...state.bySource, [found.source]: (state.bySource[found.source] ?? 0) + 1 },
+          });
         } catch (error) {
           set({ done: state.done + 1, missing: state.missing + 1, error: error instanceof Error ? error.message : String(error) });
         }

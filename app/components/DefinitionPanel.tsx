@@ -13,7 +13,7 @@ import { locateWord, type WordSpot } from '../utils/wordAudio';
 import { getWordVoice } from '../utils/storage';
 import { wordVoiceUrl } from '../utils/wordVoice';
 import { canAddWord, openManualAdd, openVocabEntry, prefillFromLookup } from '../utils/vocab/manualAdd';
-import { useInVocab } from '../hooks/useInVocab';
+import { useInVocabMatch } from '../hooks/useInVocab';
 
 // Single word-definition surface for both learning modes: a small card beside the
 // clicked word (below it, or above when there's more room there), closed by Esc, the X or a click outside. A dictionary entry is
@@ -229,12 +229,13 @@ const DefinitionPanel: React.FC<{
   // 042：已在复习库（点的词或词典给的原形任一在库）就显示「已在词库」，点开看已有词条，不重复添加。
   const headword = def.dict?.[0]?.word ?? def.data?.word ?? null;
   const vocabOn = !!vocab && canAddWord(def.word) && !def.loading;
-  const inVocab = useInVocab([def.word, headword], vocabOn);
+  const vocabMatch = useInVocabMatch([def.word, headword], vocabOn);
+  const inVocab = vocabMatch ? vocabMatch.found : null;
   const vocabBar = vocabOn && (
     <div className="shrink-0 flex items-center justify-end gap-2 border-t border-line px-4 py-2" data-testid="lookup-vocab">
       {inVocab ? (
         <Btn size="sm" tone="white" data-testid="lookup-in-vocab" title="已在词库，点开看已有词条"
-          onClick={() => { const word = def.word!; onClose(); openVocabEntry(word); }}>
+          onClick={() => { const word = vocabMatch?.word ?? def.word!; onClose(); openVocabEntry(word); }}>
           <BookOpenCheck size={14} />已在词库
         </Btn>
       ) : (

@@ -24,11 +24,17 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/** 这些写法里任意一个已在复习库就返回 true；还没读完返回 null。 */
-export function useInVocab(words: readonly (string | null | undefined)[], enabled = true): boolean | null {
-  const keys = words.map(word => manualKey(word ?? '')).filter(Boolean);
+export type VocabMatch = { found: boolean; word: string | null };
+
+/**
+ * 这些写法里哪个已在复习库，返回那个写法本身（用来打开已有词条）；还没读完返回 null。
+ * 例：点了 shattered、库里是 shatter → { found: true, word: 'shatter' }。
+ */
+export function useInVocabMatch(words: readonly (string | null | undefined)[], enabled = true): VocabMatch | null {
+  const forms = words.map(word => (word ?? '').trim()).filter(Boolean);
+  const keys = forms.map(manualKey).filter(Boolean);
   const signature = keys.join('\u0001');
-  const [state, setState] = useState<{ signature: string; version: number; value: boolean } | null>(null);
+  const [state, setState] = useState<{ signature: string; version: number; matched: string | null } | null>(null);
   const [tick, setTick] = useState(version);
 
   useEffect(() => {
@@ -42,11 +48,20 @@ export function useInVocab(words: readonly (string | null | undefined)[], enable
     let alive = true;
     const at = version;
     load().then(set => {
-      if (alive) setState({ signature, version: at, value: !!set && signature.split('\u0001').some(key => set.has(key)) });
+      if (!alive) return;
+      const atIndex = set ? keys.findIndex(key => set.has(key)) : -1;
+      setState({ signature, version: at, matched: atIndex >= 0 ? forms[atIndex] : null });
     });
     return () => { alive = false; };
-  }, [signature, enabled, tick]);
+  }, [signature, enabled, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!enabled || !signature) return null;
-  return state && state.signature === signature && state.version === tick ? state.value : null;
+  if (!state || state.signature !== signature || state.version !== tick) return null;
+  return { found: state.matched !== null, word: state.matched };
+}
+
+/** 这些写法里任意一个已在复习库就返回 true；还没读完返回 null。 */
+export function useInVocab(words: readonly (string | null | undefined)[], enabled = true): boolean | null {
+  const match = useInVocabMatch(words, enabled);
+  return match ? match.found : null;
 }

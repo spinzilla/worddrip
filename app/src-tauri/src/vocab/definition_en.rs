@@ -252,6 +252,7 @@ pub fn delete_in(conn: &Connection, request: DefinitionEnDeleteRequest) -> Resul
 fn source_label(source: &str) -> String {
   match source {
     "mine" => "我写的".into(),
+    "dict:youdao" => "来自 有道（WordNet）".into(),
     "dict:cambridge" => "来自 剑桥英英".into(),
     "dict:wiktionary" => "来自 Wiktionary".into(),
     "dict:local-wiktionary" => "来自 本地 Wiktionary".into(),

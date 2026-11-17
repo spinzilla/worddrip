@@ -13,6 +13,7 @@ import {
 } from '../../utils/vocab/firstTest';
 import { prepareRecallRound, surfaceKey, surfaceOf } from '../../utils/vocab/recall';
 import type { RecallQuestion, RecallRound } from '../../utils/vocab/recall';
+import { consumePendingRecallQuestion, prepareCachedRecallRound } from '../../utils/vocab/recallCache';
 import { hasQuestionModel, requestModelQuestions, requestUsageTasks, usageMixEnabled } from '../../utils/vocab/recallModel';
 import type { BrowseReviewWord } from '../../utils/vocab/types';
 import RecallReview from './RecallReview';
@@ -48,7 +49,7 @@ export default function FirstTestPanel({ refreshKey }: Props) {
   const [modelOn, setModelOn] = useState(false);
   const [before, setBefore] = useState<Record<string, { status: string; due: string }>>({});
   const [batchRemaining, setBatchRemaining] = useState(0);
-  /** 每次开始/退出都换号；退出后才回来的出题结果直接丢掉。 */
+  /** 只控制界面显示；退出后才回来的题照样由缓存工具保存。 */
   const tokenRef = useRef(0);
   const flaggedRef = useRef<Set<string>>(new Set());
   const recheckUsedRef = useRef<Set<string>>(new Set());
@@ -118,7 +119,7 @@ export default function FirstTestPanel({ refreshKey }: Props) {
       .then(flagged => {
         const exclude = new Set(flagged.map(entry => surfaceKey(entry.wordId, entry.detail)));
         flaggedRef.current = exclude;
-        return prepareRecallRound(batch.queue, {
+        return prepareCachedRecallRound(batch.queue, {
           generate,
           exclude,
           limit: FIRST_TEST_LIMIT,
@@ -261,6 +262,7 @@ export default function FirstTestPanel({ refreshKey }: Props) {
           modelOn={modelOn}
           before={before}
           makeRecheck={makeRecheck}
+          onQuestionConsumed={consumePendingRecallQuestion}
           onExit={exit}
           variant="first"
           remaining={batchRemaining}

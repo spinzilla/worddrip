@@ -9,7 +9,7 @@ const DEFAULT_TIMEOUT = 15000;
 
 // skipOnboarding：079 首次引导在空库里会盖住整个界面。默认替脚本先把它关掉（并记成「做过」，刷新后不再弹）；
 // 要测引导本身的脚本传 false。
-export async function connect({ port = 9337, urlIncludes = 'localhost:3000', timeout = 60000, skipOnboarding = true } = {}) {
+export async function connect({ port = 9337, urlIncludes = `localhost:${process.env.ES_E2E_DEV_PORT || 3000}`, timeout = 60000, skipOnboarding = true } = {}) {
   const deadline = Date.now() + timeout;
   let target;
   let lastErr = '';

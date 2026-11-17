@@ -27,6 +27,7 @@ export const isMine = (item: Pick<VocabDefinitionEn, 'source'>) => item.source =
 export function sourceLabel(source: string): string {
   switch (source) {
     case MINE: return '我写的';
+    case 'dict:youdao': return '来自 有道（WordNet）';
     case 'dict:cambridge': return '来自 剑桥英英';
     case 'dict:wiktionary': return '来自 Wiktionary';
     case 'dict:local-wiktionary': return '来自 本地 Wiktionary';

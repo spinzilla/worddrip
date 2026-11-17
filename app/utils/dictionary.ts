@@ -115,6 +115,24 @@ type YdTr = { l?: { i?: string[] | string } };
 type YdWord = { phone?: string; usphone?: string; ukphone?: string; 'return-phrase'?: string | { l?: { i?: string } }; trs?: { pos?: string; tran?: string; tr?: YdTr[] }[] };
 type YdCollins = { headword?: string; entries?: { entry?: { tran_entry?: { pos_entry?: { pos?: string }; tran?: string; exam_sents?: { sent?: { eng_sent?: string; chn_sent?: string }[] } }[] }[] } };
 
+/** 有道 `ee`（WordNet）的英英释义。坏数据直接跳过，不让一个来源的格式变化弄崩整次查词。 */
+export const parseYoudaoEnglish = (body: any, word: string): DictEntry | null => {
+  const groups = body?.ee?.word?.trs;
+  if (!Array.isArray(groups)) return null;
+  const senses: Sense[] = [];
+  for (const group of groups) {
+    if (!group || !Array.isArray(group.tr)) continue;
+    const pos = typeof group.pos === 'string' ? clean(group.pos) : '';
+    for (const item of group.tr) {
+      if (typeof item?.tran !== 'string') continue;
+      const text = stripTags(item.tran);
+      if (text) senses.push({ pos, text: [text], examples: [] });
+      if (senses.length === 3) return { word, phonetic: '', senses, source: 'youdao' };
+    }
+  }
+  return senses.length ? { word, phonetic: '', senses, source: 'youdao' } : null;
+};
+
 const CJK = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/;
 const stripTags = (s: string) => clean(s.replace(/<[^>]+>/g, ''));
 
@@ -397,6 +415,14 @@ export const fromSource = async (source: DictSource, word: string, lang: DictLan
   if (lang === 'ja') return parseYoudaoJa(await (await get(`https://dict.youdao.com/jsonapi?le=jap&dicts=${encodeURIComponent('{"count":99,"dicts":[["newjc"]]}')}&q=${q}`)).json());
   const body = await (await get(`https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&le=${lang}&q=${q}`)).json();
   const entry = parseYoudao(body, word);
+  return entry ? [entry] : null;
+};
+
+/** 只取有道的英英释义，不能复用普通 `fromSource('youdao')`：那条路是给中文查词卡用的。 */
+export const lookupYoudaoEnglish = async (word: string): Promise<DictEntry[] | null> => {
+  const q = encodeURIComponent(word);
+  const body = await (await get(`https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&le=en&q=${q}`)).json();
+  const entry = parseYoudaoEnglish(body, word);
   return entry ? [entry] : null;
 };
 

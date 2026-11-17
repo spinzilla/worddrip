@@ -5,6 +5,7 @@ import React, { useRef, useState } from 'react';
 import { getTranscribeConfig, saveTranscribeConfig } from '../utils/transcribeConfig';
 import { getAIConfig, saveAIConfig } from '../utils/aiConfig';
 import { setLang, useLang, useT, type Lang } from '../utils/i18n';
+import { FONT_SCALES, FontScale, getFontScale, saveFontScale } from '../utils/fontScale';
 import type { AIConfig } from '../types';
 import { Header, sheet } from './ui';
 import { describe, exportBackup, readBackupFile, startRestore } from './restore';
@@ -37,6 +38,11 @@ export const Settings: React.FC<{ needKey: boolean; onBack: () => void }> = ({ n
   };
   const [groq, setGroq] = useState(() => getTranscribeConfig().groqKey);
   const [ai, setAi] = useState(getAIConfig);
+  const [fontScale, setFontScaleState] = useState<FontScale>(getFontScale);
+  const fontLabel: Record<FontScale, string> = {
+    small: t('settingsGeneral.fontSizeSmall'), normal: t('settingsGeneral.fontSizeNormal'),
+    large: t('settingsGeneral.fontSizeLarge'), xlarge: t('settingsGeneral.fontSizeXlarge'),
+  };
   const setGroqKey = (v: string) => { setGroq(v); saveTranscribeConfig({ ...getTranscribeConfig(), groqKey: v.trim() }); };
   const setAiField = (k: keyof Pick<AIConfig, 'baseUrl' | 'apiKey' | 'model'>, v: string) => {
     const next = { ...getAIConfig(), [k]: v.trim() };
@@ -84,6 +90,12 @@ export const Settings: React.FC<{ needKey: boolean; onBack: () => void }> = ({ n
           <input ref={file} type="file" accept=".json,application/json" className="hidden"
             onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void doRestore(f); }} />
         </section>
+        <label className={`${sheet} px-4 py-3 flex items-center justify-between gap-3`}>
+          <span className="text-[15px]">{t('settingsGeneral.fontSize')}</span>
+          <select value={fontScale} onChange={e => { const v = e.target.value as FontScale; setFontScaleState(v); saveFontScale(v); }} className="min-h-[44px] bg-transparent text-[15px] text-mute">
+            {FONT_SCALES.map(s => <option key={s} value={s}>{fontLabel[s]}</option>)}
+          </select>
+        </label>
         <label className={`${sheet} px-4 py-3 flex items-center justify-between gap-3`}>
           <span className="text-[15px]">{t('settings.language')}</span>
           <select value={ui} onChange={e => setLang(e.target.value as Lang)} className="min-h-[44px] bg-transparent text-[15px] text-mute">

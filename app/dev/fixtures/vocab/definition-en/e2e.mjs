@@ -82,6 +82,30 @@ const invoke = async (page, command, args = {}) => {
 };
 const shot = (page, name, full = false) => page.screenshot(path.join(out, name), { full });
 const noOverflow = page => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+const clickWord = async (page, selector, word) => {
+  const point = await page.evaluate((sel, wanted) => {
+    const root = document.querySelector(sel);
+    root.scrollIntoView({ block: 'center', inline: 'center' });
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const at = node.data.toLowerCase().indexOf(wanted.toLowerCase());
+      if (at < 0) continue;
+      const range = document.createRange();
+      range.setStart(node, at); range.setEnd(node, at + wanted.length);
+      const r = range.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    throw new Error(`在 ${sel} 里找不到 ${wanted}`);
+  }, selector, word);
+  await page.mouseClick(point.x, point.y);
+  await page.waitFor('[data-definition-popup] [role=dialog]');
+  await sleep(250);
+};
+const closeLookup = async page => {
+  await page.click('[data-definition-popup] [role=dialog] > button');
+  await page.waitUntil('查词卡关闭', `!document.querySelector('[data-definition-popup]')`);
+};
 /** 词典测试替身：alpha/bravo 各给 2 个义项（一个带中文行、一个纯英文）；filler 里 4 个查不到；记录每次调用；每次慢 120ms 让取消来得及。 */
 const installDict = (page, missing) => page.evaluate(missingWords => {
   window.__dictCalls = [];
@@ -90,7 +114,7 @@ const installDict = (page, missing) => page.evaluate(missingWords => {
     await new Promise(resolve => setTimeout(resolve, 120));
     if (missingWords.includes(word)) return null;
     const senses = [['adj.', `first meaning of ${word}\n第一个意思`], ['n.', `second meaning of ${word}`]];
-    return { entries: [{ word, phonetic: '', source: 'cambridgeEn', senses: senses.map(([pos, text]) => ({ pos, text: [text], examples: [] })) }], source: 'dict:cambridge', online: false };
+    return { entries: [{ word, phonetic: '', source: 'youdao', senses: senses.map(([pos, text]) => ({ pos, text: [text], examples: [] })) }], source: 'dict:youdao', online: false };
   };
 }, [...missing]);
 const configureModel = page => page.evaluate(baseUrl => {
@@ -137,13 +161,18 @@ try {
   await openWord(page, 'alpha');
   await page.waitFor('[data-testid=def-en-dict-list]');
   assert.equal(await count(page, '[data-testid=def-en-dict]'), 2, '词典取到 2 个义项');
-  assert.match(await page.text('[data-testid=def-en-source]'), /来自 剑桥英英/);
+  assert.match(await page.text('[data-testid=def-en-source]'), /来自 有道（WordNet）/);
+  assert.equal(await page.text('[data-testid=def-en-lookup-hint]'), '点单词可查中文释义');
   const dictText = await page.text('[data-testid=def-en-dict-list]');
   assert.ok(dictText.includes('first meaning of alpha') && !dictText.includes('第一个意思'), '只存英文行');
   assert.equal(await page.evaluate(() => document.querySelector('[data-testid=def-en-empty]') === null), true, '有释义后不再显示「还没有英英释义」');
   await shot(page, '01-auto-dict-1280.png');
+  await clickWord(page, '[data-testid=def-en-dict-list]', 'first');
+  await shot(page, '01b-detail-lookup-1280.png');
+  await closeLookup(page);
+  evidence.checks.detailClick = true;
   let rows = await dbRows(session);
-  assert.deepEqual(rows.map(row => [row.word_key, row.source, row.pos]), [['alpha', 'dict:cambridge', 'adj.'], ['alpha', 'dict:cambridge', 'n.']]);
+  assert.deepEqual(rows.map(row => [row.word_key, row.source, row.pos]), [['alpha', 'dict:youdao', 'adj.'], ['alpha', 'dict:youdao', 'n.']]);
   assert.equal(await page.evaluate(() => window.__dictCalls.filter(word => word === 'alpha').length), 1);
   const importedDefinition = await invoke(page, 'vocab_definition_import', { request: { issues: [{ fileName: 'e2e-definition.md', content: '## 词单分析\n1. **alpha** n. — an imported definition of alpha（导入释义）\n' }], eagp: null } });
   assert.equal(importedDefinition.added, 1, '测试通过正式导入命令准备一条导入释义');
@@ -240,6 +269,14 @@ try {
   const flashWord = await page.text('.vocab-flash-back-word');
   note('闪卡词', flashWord);
   assert.ok(await page.evaluate(() => !document.querySelector('[data-testid=flash-definitions]').innerText.includes('还没有')), '闪卡背面没有「还没有英英释义」');
+  assert.equal(await page.text('[data-testid=flash-def-en-lookup-hint]'), '点单词可查中文释义');
+  const flashTextForClick = await page.text('[data-testid=flash-def-en]');
+  const clickable = ['definition', 'meaning', 'first'].find(word => flashTextForClick.toLowerCase().includes(word));
+  assert.ok(clickable, '闪卡释义里有可点击的英文单词');
+  await clickWord(page, '[data-testid=flash-def-en]', clickable);
+  await shot(page, '04b-flash-lookup-1280.png');
+  await closeLookup(page);
+  evidence.checks.flashClick = clickable;
   if (flashWord === 'alpha') {
     assert.equal(await count(page, '[data-testid=flash-def-en-mine]'), 1, '闪卡：我写的释义存在');
     assert.equal(await count(page, '[data-testid=flash-def-en-imported]'), 1, '闪卡：导入释义存在');
@@ -290,7 +327,7 @@ try {
   await page.waitFor('[data-testid=def-fill-report]', { timeout: 60000 });
   const finalReport = await page.text('[data-testid=def-fill-report]');
   note('补完报告', finalReport);
-  assert.match(finalReport, /查不到 4 个/);
+  assert.match(finalReport, /补了 \d+ 个（有道 \d+），查不到 4 个/);
   const asked = await page.evaluate(start => window.__dictCalls.slice(start), before);
   assert.ok(!asked.includes('alpha') && !asked.includes('bravo'), '已有英英释义的词不再查');
   await shot(page, '08-fill-report-1280.png');
@@ -300,6 +337,29 @@ try {
   for (const word of MISSING) assert.equal(filled.has(word), false, `${word} 查不到：没有写空记录`);
   assert.ok(rows.every(row => row.text.trim() && row.source.startsWith('dict:') || row.source === 'mine'));
   evidence.checks.fill = finalReport;
+
+  // 严格按 087 验收再跑一轮：只补 3 个词，报告要有总数和来源数。
+  await page.clickText('知道了');
+  const triple = ['triple-alpha', 'triple-bravo', 'triple-charlie'];
+  const tripleRequest = {
+    ...importRequest,
+    review: { fileName: 'definition-en-087-three.md', content: '# 词汇总词库\n' },
+    reviewWords: triple.map((word, index) => ({ id: `${word}@1.1`, word, status: 'L2', level: 2, note: `${word} 的备注`, line: index + 2, raw: `| ${word} | 1.1 |`, issue: '1.1', addedAt: today, due: '2099-01-01' })),
+  };
+  assert.equal((await invoke(page, 'vocab_import', { request: tripleRequest })).reviewWords.added, 3);
+  // 上一轮故意留下的 4 个「查不到」先补一条我写的，确保这一轮待补的恰好只有新加的 3 个。
+  for (const word of MISSING) await invoke(page, 'vocab_definition_en_add', { request: { word, source: 'mine', items: [{ pos: 'n.', text: `known meaning of ${word}` }] } });
+  await page.reload();
+  await installDict(page, new Set());
+  await openBrowse(page);
+  await page.waitFor('[data-testid=def-fill-start]');
+  assert.match(await page.text('[data-testid=def-fill]'), /有 3 个词/);
+  await page.click('[data-testid=def-fill-start]');
+  await page.waitFor('[data-testid=def-fill-report]');
+  const threeReport = await page.text('[data-testid=def-fill-report]');
+  assert.equal(threeReport, '补了 3 个（有道 3），查不到 0 个');
+  await shot(page, '08b-fill-three-1280.png');
+  evidence.checks.fillThree = threeReport;
 
   // ---------------- 7. 手机宽 390：100% 和 130% ----------------
   await openBrowse(page);
