@@ -1,8 +1,8 @@
-import type { BrowseDefinition, ExampleSource, VocabExample } from './types';
+import type { BrowseDefinition, ExampleItem, ExampleSource, VocabExample } from './types';
 import { normalizeText } from './library';
 import { findTargetForms } from './recall';
 import type { RecallQuestion } from './recall';
-import { buildGradingPrompt } from './grading';
+import { buildGradingPrompt, finalizeGrade, parseGrade, requireTaskFields } from './grading';
 import type { GradableQuestion, GradeVerdict, ModelGrade } from './grading';
 import { gradeWithModel } from './gradingModel';
 import { postChat } from './recallModel';
@@ -246,6 +246,89 @@ export function sentenceCheckFrom(written: string, grade: ModelGrade): SentenceC
 }
 
 export const MAX_OWN_SENTENCE = MAX_FIELD;
+
+/** 「让 AI 看看」任务的结构化结果：判定（成功时）或一句错误；saved / dismissed 是两处界面共用的状态。 */
+export interface OwnCheckRecord {
+  /** 原句（去掉多余空白后的）；来源里也记着一份 */
+  original: string;
+  /** 义项文字（没有就是空串）；存的时候原样带上 */
+  sense: string;
+  check?: SentenceCheck;
+  /** 模型回复没法解析等情况的中文说明 */
+  error?: string;
+  /** 存过的是哪一个按钮 */
+  saved?: OwnSaveKind;
+  /** 点了「都不存」或改了草稿：两处都收起 */
+  dismissed?: boolean;
+  /** 收起是因为改了草稿（不是按了按钮）：词条页不因此清空草稿 */
+  edited?: boolean;
+}
+
+export type OwnSaveKind = 'original' | 'fixed' | 'better';
+
+/** 把模型回复解析成判定结果；格式不对就抛中文错误（和 checkOwnSentence 同一套规则）。 */
+export function sentenceCheckFromText(word: string, sense: ExampleSense, written: string, content: string): SentenceCheck {
+  const text = written.replace(/\s+/g, ' ').trim();
+  const question = ownSentenceQuestion(word, sense);
+  return sentenceCheckFrom(text, finalizeGrade(question, text, requireTaskFields(question, parseGrade(content))));
+}
+
+/** 存一个按钮对应的例句：存原句 = 自己写；存改后 / 存更地道的 = AI 改过，并记下原句。 */
+export function ownCheckItem(kind: OwnSaveKind, record: OwnCheckRecord): ExampleItem | null {
+  const check = record.check;
+  if (!check) return null;
+  const sense = record.sense || null;
+  if (kind === 'original') {
+    return { sentence: record.original, source: '自己写', explanation: check.reason, sense };
+  }
+  const sentence = kind === 'fixed' ? check.fixed : check.better;
+  if (!sentence) return null;
+  return { sentence, source: 'AI改过', explanation: check.reason, sense, original: record.original };
+}
+
+/** 「让 AI 看看」任务的解析参数（存在任务的 resultArgs 里，重启后重试用）。 */
+export interface OwnCheckArgs { word: string; sense: ExampleSense; text: string }
+
+/** 判句任务的结果：解析失败也记成结果（带一句中文说明），界面照样显示。 */
+export function parseOwnCheckRecord(args: OwnCheckArgs, content: string): OwnCheckRecord {
+  const senseText = senseLabel(args.sense);
+  try {
+    return { original: args.text, sense: senseText, check: sentenceCheckFromText(args.word, args.sense, args.text, content) };
+  } catch (error) {
+    return { original: args.text, sense: senseText, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** 「AI 给例句」任务的解析参数。 */
+export interface ExampleGenArgs { word: string; sense: ExampleSense }
+
+/** 「AI 给例句」任务的结果：候选几句、勾选状态、已存的下标；saved / dismissed 是两处界面共用的状态。 */
+export interface ExampleGenRecord {
+  candidates: GeneratedExample[];
+  /** 勾选状态，和 candidates 一一对应 */
+  picked: boolean[];
+  /** 已经存过的候选下标 */
+  saved: number[];
+  /** 解析失败等情况的中文说明 */
+  error?: string;
+  /** 点了「都不要」或改了义项：两处都收起 */
+  dismissed?: boolean;
+}
+
+/** 把模型回复解析成候选例句；格式不对不抛错，而是记成一句错误（和原来的 requestExamples 同一套规则）。 */
+export function parseExampleGenRecord(args: ExampleGenArgs, content: string): ExampleGenRecord {
+  try {
+    const candidates = parseGeneratedExamples(content, args.word);
+    return { candidates, picked: candidates.map(() => false), saved: [] };
+  } catch (error) {
+    return { candidates: [], picked: [], saved: [], error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** 存一句 AI 候选时的例句（来源 AI生成、说明、义项，和原来一样）。 */
+export function generatedItem(example: GeneratedExample, sense: ExampleSense): ExampleItem {
+  return { sentence: example.sentence, source: 'AI生成', explanation: generatedExplanation(example) || null, sense: senseLabel(sense) || null };
+}
 
 /** 判断用户自己写的一句。没配模型、断网、格式不对都抛中文错误（和造句题判分同一套报错）。 */
 export async function checkOwnSentence(word: string, sense: ExampleSense, written: string, options: { timeoutMs?: number } = {}): Promise<SentenceCheck> {

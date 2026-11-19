@@ -316,7 +316,9 @@ try {
   list = await sentences(page);
   note('存改后', list[0]);
   assert.deepEqual(list[0], { sentence: FIXED, source: 'AI改过', original: WRONG, explanation: FIX_REASON });
-  assert.equal(await page.evaluate(sel => !!document.querySelector(`${sel} [data-testid=own-result]`), S), false, '存完收起结果');
+  // 092 起：结果来自 AI 任务中心，存完不再收起，而是变成「已存」（按钮不再显示）。
+  assert.match(await page.text(`${S} [data-testid=own-saved]`), /已存/, '存完变成「已存」');
+  assert.equal(await page.evaluate(sel => !!document.querySelector(`${sel} [data-testid=own-save-fixed]`), S), false, '存完按钮不再显示');
   await page.evaluate(sel => document.querySelector(sel).scrollIntoView({ block: 'start' }), S);
   await shot(page, '04-saved-three-1280.png');
   assert.equal(await noOverflow(page), true);
@@ -337,9 +339,14 @@ try {
   await page.evaluate(sel => document.querySelector(sel).scrollIntoView({ block: 'start' }), S);
   assert.equal(await noOverflow(page), true, '390 详情不横向溢出');
   await shot(page, '06-examples-390.png');
-  await page.click(`${S} [data-testid=example-ai-open]`);
+  // 093 起：1280 宽点「AI 给例句」会展开小窗；缩到 390 时小窗抽屉还开着，盖住词条页，先收起。
+  if (await page.evaluate(() => !!document.querySelector('[data-testid=ai-panel][data-mode=mobile]'))) await page.click('[data-testid=ai-close]');
+  // 093 起：「AI 给例句」的候选在任务里，回到词条页时面板默认就是打开的（点按钮会收起），所以没打开才点。
+  if (!(await page.evaluate(sel => !!document.querySelector(sel), `${S} [data-testid=example-panel-generate]`))) await page.click(`${S} [data-testid=example-ai-open]`);
   await page.click(`${S} [data-testid=example-generate]`);
   await page.waitUntil('390 下 AI 给了 3 句', `document.querySelectorAll('${S} [data-testid=generated-item]').length === 3`);
+  // 093 起：点「AI 给例句」会把小窗抽屉展开到这条，抽屉盖住词条页，这里收起（手机上也是用户要做的一步）。
+  if (await page.evaluate(() => !!document.querySelector('[data-testid=ai-panel][data-mode=mobile]'))) await page.click('[data-testid=ai-close]');
   await page.evaluate(sel => document.querySelector(`${sel} [data-testid=example-panel-generate]`).scrollIntoView({ block: 'start' }), S);
   assert.equal(await noOverflow(page), true, '390 生成面板不横向溢出');
   await shot(page, '07-generate-390.png');

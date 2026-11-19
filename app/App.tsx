@@ -43,6 +43,7 @@ import { startAutoSync } from './utils/sync';
 import { onGotoSyncSettings } from './components/SyncStatus';
 import { onGotoDailySettings } from './utils/vocab/dailyWords';
 import QuickNoteHost from './components/QuickNoteHost';
+import AiPanelHost from './components/ai/AiPanel';
 import { registerNoteSource } from './utils/quicknote/context';
 import { IS_MOBILE } from './utils/platform';
 
@@ -547,6 +548,8 @@ export default function App() {
       <NoteJobToast onGo={() => { requestOpenInbox(); setAppState(AppState.VOCAB); }} />
       {/* 055：随手记快捷框（Ctrl+J），所有页面都有。 */}
       {!IS_MOBILE && <QuickNoteHost />}
+      {/* 091：AI 小窗（电脑右侧栏 / 浮层，手机抽屉）；看视频、精听、阅读这些全屏页不挂。 */}
+      <AiPanelHost enabled={![AppState.WATCH, AppState.LISTEN, AppState.READ, AppState.PRACTICE].includes(appState)} />
     </>
   );
 }

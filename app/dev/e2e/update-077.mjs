@@ -1,6 +1,6 @@
-// 077 电脑真实链路：隔离启动 0.9.2 的真实窗口，把更新清单指到本机，走「提示条 → 现在更新 → 下载校验」。
-// 前置：node app/dev/release.mjs build --allow-dirty 打出一个更高版本（例如 0.9.99）到 D:\tmp\es-release\<版本>。
-//   node dev/e2e/update-077.mjs 0.9.99
+// 077 电脑真实链路：隔离启动当前版本的真实窗口，把更新清单指到本机，走「提示条 → 现在更新 → 下载校验」。
+// 前置：node app/dev/release.mjs build --allow-dirty 打出一个更高版本（例如 0.11.99）到 D:\tmp\es-release\<版本>。
+//   node dev/e2e/update-077.mjs 0.11.99
 // 到「调用安装」为止：本机 localStorage 的 worddrip.update.dryRun=1 让它下载并校验完就停（不安装、不重启）。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +8,7 @@ import { connect } from './cdp.mjs';
 import { start, stop } from './launch.mjs';
 import { serveRelease } from '../update-server.mjs';
 
-const version = process.argv[2] || '0.9.99';
+const version = process.argv[2] || '0.11.99';
 const cur = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 const srv = await serveRelease({ version });
 const runDir = path.join('D:/tmp/es-e2e', `update-${Date.now()}`);

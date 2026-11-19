@@ -273,6 +273,7 @@ try {
 
   // ---------------- 4. 教练页：查词卡「加入词库」→ 预填 → 保存 → 再点显示「已在词库」 ----------------
   await page.clickText('教练');
+  await page.click('[data-testid=coach-tab-errors]'); // 096：教练页分了小标签，默认是写作练习
   await page.waitFor('[data-testid=coach-item]');
   await clickWord(page, '[data-testid=coach-item] dd', 'ever');
   await page.waitUntil('「加入词库」可点', `document.querySelector('[data-testid=lookup-add-vocab]')?.disabled === false`);

@@ -231,6 +231,7 @@ try {
 
   // 6. 教练、设置。
   await page.clickText('教练');
+  await page.click('[data-testid=coach-tab-errors]'); // 096：教练页分了小标签，默认是写作练习
   await page.waitFor('[data-testid=coach-item]');
   await shot('10-coach-1280.png');
   // 「设置」用上游 i18n，跟系统语言走：中文系统显示「设置」，英文系统显示 Settings。

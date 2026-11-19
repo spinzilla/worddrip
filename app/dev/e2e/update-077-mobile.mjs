@@ -1,6 +1,6 @@
 // 077 手机界面链路（浏览器里用安卓 UA、390×844 模拟）：用本机清单走到「下载完成、sha256 通过」，
 // 安装调用由测试替身（window.__wdInstallCalls）记录。再改一个字节验证「校验失败」，并截 设置 → 关于（含 130% 字号）。
-//   node dev/e2e/update-077-mobile.mjs 0.9.99
+//   node dev/e2e/update-077-mobile.mjs 0.11.99
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { serveRelease } from '../update-server.mjs';
 
-const version = process.argv[2] || '0.9.99';
+const version = process.argv[2] || '0.11.99';
 const srv = await serveRelease({ version, port: 8098 });
 // lib.mjs 的 open() 在 Windows 上起不了 npm，这里自己起 vite（node 直接跑）和系统 Chrome。
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');

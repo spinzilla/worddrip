@@ -79,6 +79,9 @@ try {
     window.__ES_E2E_HTTP_FETCH__ = window.fetch.bind(window);
   }, `http://127.0.0.1:${modelPort}/v1`);
   await page.clickText('教练');
+  await page.click('[data-testid=coach-tab-errors]'); // 096：教练页分了小标签，默认是写作练习
+  await page.waitFor('[data-testid="coach-empty"]');
+  await page.click('[data-testid=coach-tab-essay]');
   await page.waitFor('[data-testid="essay-review"]');
 
   // 复用 018 的真实导入命令，让首条提示词确实读到错误档案 Top。
@@ -88,8 +91,10 @@ try {
     const { vocabApi } = await import('/utils/vocab/api.ts');
     await vocabApi.importErrors({ ...parseErrorArchive(markdown), source: { fileName: 'errors.md', content: markdown } });
   }, archive);
+  await page.click('[data-testid=coach-tab-errors]');
   await page.click('[data-testid="coach-refresh"]');
   await page.waitFor('[data-testid="coach-data"]');
+  await page.click('[data-testid=coach-tab-essay]');
 
   // 超过 400 词必须先问，确认前一次模型请求都不能发。
   await page.type('[data-testid="review-essay"]', `RETURN_BAD_JSON ${'ordinary '.repeat(400)}word`);

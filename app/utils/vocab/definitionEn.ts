@@ -189,6 +189,33 @@ export function parseDefinitionCheck(content: string, written: string): Definiti
   };
 }
 
+/** 「AI 帮我看看」任务的解析参数：哪一条释义（id）、词、词性、当时写的文字。 */
+export interface DefCheckArgs { id: number; word: string; pos: string; written: string }
+
+/** 「AI 帮我看看」任务的结果：判断 + 改写建议；replaced / dismissed 是两处界面共用的状态。 */
+export interface DefCheckRecord {
+  /** 要替换的那条释义 */
+  id: number;
+  pos: string;
+  written: string;
+  check?: DefinitionCheck;
+  error?: string;
+  /** 点了「用这个替换」：两处都变成「已替换」 */
+  replaced?: boolean;
+  /** 点了「不换」或改了释义：两处都收起 */
+  dismissed?: boolean;
+}
+
+/** 解析模型回复；格式不对记成一句中文错误（不抛）。 */
+export function parseDefCheckRecord(args: DefCheckArgs, content: string): DefCheckRecord {
+  const base = { id: args.id, pos: args.pos, written: args.written };
+  try {
+    return { ...base, check: parseDefinitionCheck(content, args.written) };
+  } catch (error) {
+    return { ...base, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 /** 让模型看自己写的这条。没配模型、断网、格式不对都抛中文错误。 */
 export async function checkOwnDefinition(word: string, pos: string, written: string, options: { timeoutMs?: number } = {}): Promise<DefinitionCheck> {
   const text = written.replace(/\s+/g, ' ').trim();

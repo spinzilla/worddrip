@@ -5,6 +5,7 @@ import { coachItemTitle, emptyCoachArchive, isCoachEmpty } from '../../utils/coa
 import { vocabApi } from '../../utils/vocab/api';
 import type { CoachItem } from '../../utils/vocab/types';
 import EssayReview from './EssayReview';
+import WritingPractice from '../writing/WritingPractice';
 import Lookable from '../Lookable';
 import { useT } from '../../utils/i18n';
 
@@ -30,8 +31,17 @@ function ItemDetail({ item }: { item: CoachItem }) {
   );
 }
 
+type CoachTab = 'writing' | 'essay' | 'errors';
+const TAB_KEY = 'english-studio.coach.tab';
+const TABS: readonly CoachTab[] = ['writing', 'essay', 'errors'];
+const readTab = (): CoachTab => {
+  try { const saved = localStorage.getItem(TAB_KEY); return TABS.find(tab => tab === saved) ?? 'writing'; } catch { return 'writing'; }
+};
+
 export default function CoachPage() {
   const t = useT();
+  const [tab, setTabState] = useState<CoachTab>(readTab);
+  const setTab = (next: CoachTab) => { setTabState(next); try { localStorage.setItem(TAB_KEY, next); } catch { /* 记不住就算了 */ } };
   const [data, setData] = useState(emptyCoachArchive);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,11 +68,8 @@ export default function CoachPage() {
       <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-ink">{t('nav.coach')}</h1>
-          <p className="mt-2 text-sm text-mute">回看高频错误和每次批改，把还没掌握的内容继续巩固。</p>
+          <p className="mt-2 text-sm text-mute">练一练写作、批改作文、回看高频错误，把还没掌握的内容继续巩固。</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} title="重新读取错误档案" aria-label="刷新错误档案" data-testid="coach-refresh" className="press shrink-0 rounded-xl border border-line bg-page p-2.5 text-ink">
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-        </button>
       </div>
 
       {modelMissing && (
@@ -72,8 +79,22 @@ export default function CoachPage() {
       )}
       {error && <p role="alert" className="mb-4 break-words rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">{error}</p>}
 
-      <EssayReview top={data.top} onArchived={load} />
+      <div role="tablist" aria-label={t('coach.tabs')} className="mb-5 flex min-w-0 flex-wrap gap-2" data-testid="coach-tabs">
+        {TABS.map(id => (
+          <button key={id} type="button" role="tab" id={`coach-tab-${id}`} aria-selected={tab === id} aria-controls={`coach-panel-${id}`} onClick={() => setTab(id)} data-testid={`coach-tab-${id}`}
+            className={`press rounded-xl border px-4 py-2 text-sm ${tab === id ? 'border-ink bg-ink text-white' : 'border-line bg-page text-ink'}`}>{t(`coach.tab.${id}` as 'coach.tab.writing')}</button>
+        ))}
+      </div>
 
+      <div role="tabpanel" id="coach-panel-writing" aria-labelledby="coach-tab-writing" hidden={tab !== 'writing'} data-testid="coach-panel-writing"><WritingPractice /></div>
+      <div role="tabpanel" id="coach-panel-essay" aria-labelledby="coach-tab-essay" hidden={tab !== 'essay'} data-testid="coach-panel-essay"><EssayReview top={data.top} onArchived={load} /></div>
+
+      <div role="tabpanel" id="coach-panel-errors" aria-labelledby="coach-tab-errors" hidden={tab !== 'errors'} data-testid="coach-panel-errors">
+      <div className="mb-4 flex justify-end">
+        <button type="button" onClick={() => void load()} disabled={loading} title="重新读取错误档案" aria-label="刷新错误档案" data-testid="coach-refresh" className="press shrink-0 rounded-xl border border-line bg-page p-2.5 text-ink">
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
       {loading && empty ? (
         <p className="rounded-2xl border border-line bg-page p-6 text-sm text-mute">正在读取错误档案……</p>
       ) : empty ? (
@@ -154,6 +175,7 @@ export default function CoachPage() {
           </section>
         </div>
       )}
+      </div>
     </Lookable></div>
   );
 }

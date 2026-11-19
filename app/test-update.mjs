@@ -64,4 +64,10 @@ await assert.rejects(L.downloadAndVerifyApk(serve(apk), good, { save: async () =
 assert.equal(L.classifyUpdateError(new Error('the signature could not be verified')), 'checksum');
 assert.equal(L.classifyUpdateError(new Error('error sending request')), 'network');
 
+// 回到前台：从没查过要查；1 小时内不重复；满 1 小时再查
+const now = 1_800_000_000_000;
+assert.equal(L.shouldCheckOnResume(null, now), true, '从没查过，回到前台要查');
+assert.equal(L.shouldCheckOnResume(now - 59 * 60_000, now), false, '59 分钟前查过，不重复查');
+assert.equal(L.shouldCheckOnResume(now - 61 * 60_000, now), true, '61 分钟前查过，再查一次');
+
 console.log('test-update 通过');

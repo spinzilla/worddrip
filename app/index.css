@@ -88,6 +88,10 @@ select option { background: var(--page); color: var(--ink); }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; border: 3px solid var(--paper); }
 
+/* 091 AI 小窗右侧栏：电脑宽屏时 --ai-dock 是侧栏（或收起后窄边）的宽度，整个应用往左让；其他形态为 0。 */
+#root { padding-right: var(--ai-dock, 0px); transition: padding-right 160ms ease; }
+@media (prefers-reduced-motion: reduce) { #root { transition: none; } }
+
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 .blink { animation: blink 1.2s ease-in-out infinite; }
 

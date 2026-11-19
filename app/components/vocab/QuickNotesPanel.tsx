@@ -6,7 +6,9 @@ import { vocabApi } from '../../utils/vocab/api';
 import { openManualAdd } from '../../utils/vocab/manualAdd';
 import { notifyExamplesChanged } from '../../utils/vocab/examples';
 import { describeContext } from '../../utils/quicknote/context';
-import { askAboutQuickNote } from '../../utils/quicknote/ask';
+import { askAboutQuickNote, QUICKNOTE_ASK_KIND } from '../../utils/quicknote/ask';
+import { aiPanelState } from '../ai/panelState';
+import { isLiveTask, useAiTasksBy } from '../ai/useAiTasksBy';
 import { formatQuickNotesMarkdown, quickNoteReopenArgs, quickNoteWordPrefill, suggestQuickNoteDestination, suggestionLabel } from '../../utils/quicknote/triage';
 import { onQuickNotesChanged } from '../../utils/quicknote/changed';
 import useQuickNoteCount from './useQuickNoteCount';
@@ -35,9 +37,11 @@ function QuickNoteItem({ note, words, onChanged, onDeleted, onVocabUpdated }: {
   const [error, setError] = useState('');
   const [chooseWord, setChooseWord] = useState(false);
   const [selectedWord, setSelectedWord] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [asking, setAsking] = useState(false);
   const [aiError, setAiError] = useState('');
+  // 「问 AI」是后台任务（090）：切页面不断；回复在 AI 小窗里看，这里从同一个任务读答案。
+  const askTasks = useAiTasksBy({ kind: QUICKNOTE_ASK_KIND, noteId: String(note.id) });
+  const askTask = askTasks[0];
+  const asking = isLiveTask(askTask);
   const suggestion = suggestQuickNoteDestination(note.body, note.context);
   const context = describeContext(note.context);
   const entryWord = note.context.kind === 'entry' ? words.find(item => item.word.toLowerCase() === note.context.word?.toLowerCase())?.word : undefined;
@@ -75,12 +79,14 @@ function QuickNoteItem({ note, words, onChanged, onDeleted, onVocabUpdated }: {
     finally { setSaving(false); }
   };
 
-  const ask = async () => {
+  // 建任务后请小窗展开到这一条（电脑侧栏 / 手机抽屉）。
+  const ask = () => {
     if (asking || !hasQuestionModel()) return;
-    setAsking(true); setAiError(''); setAnswer('');
-    try { setAnswer(await askAboutQuickNote(note)); }
-    catch (reason) { setAiError(errorText(reason)); }
-    finally { setAsking(false); }
+    setAiError('');
+    try {
+      const outcome = askAboutQuickNote(note);
+      if ('reason' in outcome) setAiError(outcome.reason); else aiPanelState.reveal(outcome.task.id);
+    } catch (reason) { setAiError(errorText(reason)); }
   };
 
   const saveEdit = async () => {
@@ -142,7 +148,9 @@ function QuickNoteItem({ note, words, onChanged, onDeleted, onVocabUpdated }: {
           {words.length === 0 && <span className="text-xs text-mute">词库目前没有词条。</span>}
         </div>
       )}
-      {answer && <div className="mt-3 rounded-xl border border-line bg-shade p-3 text-sm leading-6 text-ink" data-testid="quicknote-ai-answer"><div className="mb-1 text-xs font-medium text-mute">AI 回答（这条仍在待整理）</div><p className="vocab-wrap whitespace-pre-wrap">{answer}</p></div>}
+      {askTask?.text && <div className="mt-3 rounded-xl border border-line bg-shade p-3 text-sm leading-6 text-ink" data-testid="quicknote-ai-answer"><div className="mb-1 flex items-center gap-1 text-xs font-medium text-mute">AI 回答（这条仍在待整理）{asking && <Loader2 size={11} className="animate-spin" />}</div><p className="vocab-wrap whitespace-pre-wrap">{askTask.text}</p></div>}
+      {asking && !askTask?.text && <p className="mt-3 text-xs text-mute" data-testid="quicknote-ai-status">AI 正在回答…（在小窗里看进度）</p>}
+      {askTask?.status === 'failed' && askTask.error && <p role="alert" className="mt-2 text-xs text-danger" data-testid="quicknote-ai-error">{askTask.error}</p>}
       {aiError && <p role="alert" className="mt-2 text-xs text-danger" data-testid="quicknote-ai-error">{aiError}</p>}
       {!editing && <div className="mt-3 flex flex-wrap items-center gap-2">
         {note.status === '已整理' && <button type="button" className={buttonClass} disabled={saving} onClick={() => {

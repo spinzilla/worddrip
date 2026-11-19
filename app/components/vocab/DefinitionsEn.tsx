@@ -3,7 +3,6 @@ import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Sparkles, Trash2 } fr
 import { vocabApi } from '../../utils/vocab/api';
 import {
   MINE,
-  checkOwnDefinition,
   definitionKey,
   definitionView,
   groupDefinitions,
@@ -11,10 +10,14 @@ import {
   onDefinitionsChanged,
   sourceLabel,
 } from '../../utils/vocab/definitionEn';
-import type { DefinitionCheck, ImportedEnglish } from '../../utils/vocab/definitionEn';
+import type { ImportedEnglish } from '../../utils/vocab/definitionEn';
 import { autoFetchDefinition } from '../../utils/vocab/definitionEnDict';
+import { dismissDefCheck, DEF_CHECK_KIND, startDefinitionCheck, visibleDefCheck } from '../../utils/vocab/defCheckTask';
 import { hasQuestionModel } from '../../utils/vocab/recallModel';
 import type { VocabDefinitionEn } from '../../utils/vocab/types';
+import { aiPanelState } from '../ai/panelState';
+import { isLiveTask, useAiTasksBy } from '../ai/useAiTasksBy';
+import DefCheckResult from '../ai/DefCheckResult';
 
 // 078 英英释义：我写的（排第一，可改可删，AI 帮我看看）、词典查来的（有别的释义时收起，可「改成我的」）。
 // 打开一个没有任何英英释义的词会自动查一次词典（只查这一个词）；查不到时安静地显示「还没有英英释义」。
@@ -49,9 +52,11 @@ function MineItem({ item, word }: { item: VocabDefinitionEn; word: string }) {
   const [text, setText] = useState(item.text);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [check, setCheck] = useState<DefinitionCheck | null>(null);
-  const [checking, setChecking] = useState(false);
   const canAi = hasQuestionModel();
+  // 「AI 帮我看看」的任务（093）：按这一条释义（ref = id）找，释义区和小窗共用同一个任务。
+  const checkTasks = useAiTasksBy({ kind: DEF_CHECK_KIND, word, ref: String(item.id) });
+  const checkTask = visibleDefCheck(checkTasks);
+  const checkLive = isLiveTask(checkTasks[0]);
 
   const save = async (nextText = text, nextPos = pos) => {
     if (busy || !nextText.trim()) return;
@@ -59,7 +64,9 @@ function MineItem({ item, word }: { item: VocabDefinitionEn; word: string }) {
     try {
       await vocabApi.updateDefinitionEn({ id: item.id, pos: nextPos, text: nextText });
       notifyDefinitionsChanged();
-      setMode('view'); setCheck(null);
+      setMode('view');
+      // 改了释义，之前那次的改写建议就作废（收起）。
+      if (checkTask && !checkLive) dismissDefCheck(checkTask);
     } catch (reason) { setError(`保存失败：${errorText(reason)}`); } finally { setBusy(false); }
   };
   const remove = async () => {
@@ -67,9 +74,12 @@ function MineItem({ item, word }: { item: VocabDefinitionEn; word: string }) {
     setBusy(true); setError('');
     try { await vocabApi.deleteDefinitionEn(item.id); notifyDefinitionsChanged(); } catch (reason) { setError(`删除失败：${errorText(reason)}`); setBusy(false); }
   };
-  const ask = async () => {
-    setChecking(true); setError(''); setCheck(null);
-    try { setCheck(await checkOwnDefinition(word, item.pos ?? '', item.text)); } catch (reason) { setError(errorText(reason)); } finally { setChecking(false); }
+  // 建一个「AI 帮我看看」任务后台去跑；建完小窗展开到这条。
+  const ask = () => {
+    setError('');
+    const outcome = startDefinitionCheck(word, item);
+    if ('reason' in outcome) setError(outcome.reason);
+    else aiPanelState.reveal(outcome.task.id);
   };
 
   return (
@@ -79,7 +89,7 @@ function MineItem({ item, word }: { item: VocabDefinitionEn; word: string }) {
         {item.pos && <span className="vocab-chip border-ink/15 bg-shade text-mute italic">{item.pos}</span>}
         {mode === 'view' && (
           <span className="ml-auto flex min-w-0 flex-wrap justify-end gap-1">
-            {canAi && <button type="button" onClick={() => void ask()} disabled={checking} className={btn} data-testid="def-en-ai">{checking ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}AI 帮我看看</button>}
+            {canAi && <button type="button" onClick={() => ask()} disabled={checkLive} className={btn} data-testid="def-en-ai">{checkLive ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}AI 帮我看看</button>}
             <button type="button" onClick={() => { setPos(item.pos ?? ''); setText(item.text); setMode('edit'); setError(''); }} className={btn} data-testid="def-en-edit"><Pencil size={12} />编辑</button>
             <button type="button" onClick={() => { setMode('confirm'); setError(''); }} className={`${btn} hover:text-danger`} data-testid="def-en-delete"><Trash2 size={12} />删除</button>
           </span>
@@ -97,21 +107,7 @@ function MineItem({ item, word }: { item: VocabDefinitionEn; word: string }) {
       ) : (
         <p className="vocab-wrap mt-1.5 font-serif text-base leading-relaxed text-ink" data-testid="def-en-text">{item.text}</p>
       )}
-      {check && (
-        <div className="mt-2 rounded-xl border border-line bg-page p-3 text-sm" data-testid="def-en-check">
-          <p className="vocab-wrap text-ink"><span className="font-medium">{check.good ? '没问题：' : '建议改一改：'}</span>{check.comment}</p>
-          {check.suggestion && (
-            <>
-              <p className="vocab-wrap mt-2 font-serif text-base text-ink" data-testid="def-en-suggestion">{check.suggestion}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" onClick={() => void save(check.suggestion, item.pos ?? '')} disabled={busy} className="press rounded-lg bg-ink px-3 py-1.5 text-sm text-white disabled:opacity-45" data-testid="def-en-apply">用这个替换</button>
-                <button type="button" onClick={() => setCheck(null)} className="press rounded-lg border border-line px-3 py-1.5 text-sm text-ink" data-testid="def-en-keep">不换</button>
-              </div>
-            </>
-          )}
-          {!check.suggestion && <button type="button" onClick={() => setCheck(null)} className="press mt-2 rounded-lg border border-line px-3 py-1.5 text-sm text-ink">知道了</button>}
-        </div>
-      )}
+      {checkTask && <DefCheckResult task={checkTask} />}
       {mode === 'confirm' && (
         <div role="alertdialog" aria-label="确认删除英英释义" className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-ink" data-testid="def-en-delete-confirm">
           <span className="min-w-[10rem] flex-1">删除这条英英释义？删了找不回来。</span>

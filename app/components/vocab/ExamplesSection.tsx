@@ -1,21 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { IS_MOBILE } from '../../utils/platform';
-import { Check, Loader2, PenLine, Plus, Quote, Sparkles, Trash2 } from 'lucide-react';
+import { Loader2, PenLine, Quote, Sparkles, Trash2 } from 'lucide-react';
 import HelpHint from './HelpHint';
 import { vocabApi } from '../../utils/vocab/api';
 import {
   addExamplesTo,
-  checkOwnSentence,
-  generatedExplanation,
   groupExamples,
   MAX_OWN_SENTENCE,
   notifyExamplesChanged,
   onExamplesChanged,
   removeExample,
-  requestExamples,
   senseLabel,
 } from '../../utils/vocab/examples';
-import type { ExampleSense, GeneratedExample, SentenceCheck } from '../../utils/vocab/examples';
+import type { ExampleSense, OwnCheckRecord } from '../../utils/vocab/examples';
+import { dismissOwnCheck, EXAMPLE_CHECK_KIND, startOwnSentenceCheck, visibleOwnCheck } from '../../utils/vocab/ownCheckTask';
+import { dismissExampleGen, EXAMPLE_GEN_KIND, startExampleGen, visibleExampleGen } from '../../utils/vocab/exampleGenTask';
+import { aiPanelState } from '../ai/panelState';
+import { isLiveTask, useAiTasksBy } from '../ai/useAiTasksBy';
+import OwnCheckResult from '../ai/OwnCheckResult';
+import ExampleGenResult from '../ai/ExampleGenResult';
 import SceneTag from './SceneTag';
 import type { SceneControl } from './SceneTag';
 import { formatNoteTime } from '../../utils/vocab/notes';
@@ -137,23 +140,36 @@ export default function ExamplesSection({ word, examples, senses, handlers, comp
   /** 048：传了就在每句后面显示场景标签（只有闪卡背面传）。 */
   scenes?: SceneControl;
 }) {
-  const [panel, setPanel] = useState<Panel>('none');
+  // 「让 AI 看看」的任务在任务中心里（来源：这个词），切页面再回来也能找回；小窗里的同一条任务也共用它。
+  const ownTasks = useAiTasksBy({ kind: EXAMPLE_CHECK_KIND, word });
+  const ownTask = visibleOwnCheck(ownTasks);
+  const ownLive = isLiveTask(ownTasks[0]);
+  const ownShown = !!(ownTask?.result as OwnCheckRecord | undefined)?.check; // 已有判定结果（没有就显示「直接存」）
+
+  // 「AI 给例句」的任务（093）：来源是这个词，切页面再回来、小窗里的同一条都能找回。
+  const genTasks = useAiTasksBy({ kind: EXAMPLE_GEN_KIND, word });
+  const genTask = visibleExampleGen(genTasks);
+  const genLive = isLiveTask(genTasks[0]);
+
+  const [panel, setPanel] = useState<Panel>(() => (!compact && genTask ? 'generate' : !compact && ownTask ? 'own' : 'none'));
   const [senseIndex, setSenseIndex] = useState(0);
   const sense = senses[Math.min(senseIndex, senses.length - 1)] ?? { pos: '', english: '', chinese: '' };
   const senseText = senseLabel(sense);
   const modelOn = hasQuestionModel();
   const [tip, setTip] = useState('');
 
-  // ---- AI 给例句
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState<GeneratedExample[]>([]);
-  const [picked, setPicked] = useState<boolean[]>([]);
+  // ---- AI 给例句：只剩「建任务失败」的一句提示，候选在任务里（ExampleGenResult）
   const [genError, setGenError] = useState('');
   // ---- 自己写
   const [draft, setDraft] = useState('');
-  const [checking, setChecking] = useState(false);
-  const [checked, setChecked] = useState<{ text: string; result: SentenceCheck } | null>(null);
   const [ownError, setOwnError] = useState('');
+  // 判句存了（任一处）或都不存：草稿清掉，免得同一句再点又建一个任务。
+  const ownRecord = ownTasks[0]?.result as OwnCheckRecord | undefined;
+  useEffect(() => {
+    // 改草稿造成的收起不算（否则重新打一句和旧结果一样的话，刚打的就被清掉）。
+    if (!ownRecord || ownRecord.edited || !(ownRecord.saved || ownRecord.dismissed)) return;
+    setDraft(current => (current.replace(/\s+/g, ' ').trim() === ownRecord.original ? '' : current));
+  }, [ownRecord]);
   // ---- 保存
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -175,45 +191,40 @@ export default function ExamplesSection({ word, examples, senses, handlers, comp
     }
   }, [handlers, saving, word]);
 
-  const generate = async () => {
-    if (generating || !modelOn) return;
-    setGenerating(true);
+  // 建一个「AI 给例句」任务后台去跑；建完小窗展开到这条。候选、勾选在任务里，这里和小窗都能看、能存。
+  const generate = () => {
+    if (genLive || !modelOn) return;
     setGenError('');
     setSaveError('');
     setTip('');
-    setGenerated([]);
-    setPicked([]);
-    try {
-      const list = await requestExamples(word, sense);
-      setGenerated(list);
-      setPicked(list.map(() => false));
-    } catch (reason) {
-      setGenError(errorText(reason));
-    } finally {
-      setGenerating(false);
-    }
+    const outcome = startExampleGen(word, sense);
+    if ('reason' in outcome) setGenError(outcome.reason);
+    else aiPanelState.reveal(outcome.task.id);
+  };
+  const onGenSaved = (saved: VocabExample[]) => {
+    handlers.onSaved(saved);
+    setTip(`已存 ${saved.length} 句。`);
   };
 
-  const check = async () => {
-    if (checking || !modelOn || !draft.trim()) return;
-    setChecking(true);
+  // 建一个「让 AI 看」任务后台去跑（切页面不断），结果在这里和小窗里都能看、能存。
+  const check = () => {
+    if (ownLive || !modelOn || !draft.trim()) return;
     setOwnError('');
     setSaveError('');
     setTip('');
-    setChecked(null);
-    const text = draft.replace(/\s+/g, ' ').trim();
-    try {
-      setChecked({ text, result: await checkOwnSentence(word, sense, text) });
-    } catch (reason) {
-      setOwnError(errorText(reason));
-    } finally {
-      setChecking(false);
-    }
+    const outcome = startOwnSentenceCheck(word, sense, draft);
+    if ('reason' in outcome) setOwnError(outcome.reason);
   };
 
-  const resetOwn = () => { setDraft(''); setChecked(null); setOwnError(''); };
+  // 改了草稿：上一条结果（不在跑的）收起，和原来「改了就清掉结果」一样。
+  const onDraftChange = (value: string) => {
+    setDraft(value);
+    setOwnError('');
+    if (ownTask && !ownLive) dismissOwnCheck(ownTask, true);
+  };
+
+  const resetOwn = () => { setDraft(''); setOwnError(''); };
   const open = (next: Panel) => { setPanel(current => (current === next ? 'none' : next)); setTip(''); setSaveError(''); };
-  const pickedCount = picked.filter(Boolean).length;
   const showList = !compact || examples.length > 0;
 
   return (
@@ -248,7 +259,7 @@ export default function ExamplesSection({ word, examples, senses, handlers, comp
               按哪个意思
               <select
                 value={senseIndex}
-                onChange={event => { setSenseIndex(Number(event.target.value)); setGenerated([]); setPicked([]); setChecked(null); }}
+                onChange={event => { setSenseIndex(Number(event.target.value)); if (genTask && !genLive) dismissExampleGen(genTask); if (ownTask && !ownLive) dismissOwnCheck(ownTask, true); }}
                 className="mt-1 block w-full min-w-0 max-w-full truncate rounded-lg border border-line bg-page px-2 py-1.5 text-sm text-ink"
                 data-testid="example-sense"
               >
@@ -267,53 +278,14 @@ export default function ExamplesSection({ word, examples, senses, handlers, comp
           {panel === 'generate' && (
             <div className="mt-2">
               <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => void generate()} disabled={!modelOn || generating} className={btnPrimary} data-testid="example-generate">
-                  {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  {generating ? '正在请 AI 写…' : generated.length > 0 ? '换一批' : '让 AI 写 2–3 句'}
+                <button type="button" onClick={() => generate()} disabled={!modelOn || genLive} className={btnPrimary} data-testid="example-generate">
+                  {genLive ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  {genLive ? 'AI 正在写…（在小窗里看进度）' : genTask ? '换一批' : '让 AI 写 2–3 句'}
                 </button>
                 <span className="text-xs text-mute">只发这个词、词性和所选意思。</span>
               </div>
               {genError && <p role="alert" className="vocab-wrap mt-2 text-xs text-danger" data-testid="example-generate-error">{genError}</p>}
-              {generated.length > 0 && (
-                <>
-                  <p className="mt-3 text-xs text-mute">勾选想存的句子（AI 写的，存前看一眼对不对）：</p>
-                  <ul className="mt-1.5 space-y-2" data-testid="generated-list">
-                    {generated.map((item, index) => (
-                      <li key={index} className="vocab-note flex min-w-0 items-start gap-2" data-testid="generated-item">
-                        <input
-                          type="checkbox"
-                          checked={picked[index] ?? false}
-                          onChange={event => setPicked(list => list.map((value, i) => (i === index ? event.target.checked : value)))}
-                          aria-label={`选第 ${index + 1} 句`}
-                          className="mt-1.5 h-4 w-4 shrink-0"
-                          data-testid="generated-check"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="vocab-wrap font-serif text-base leading-relaxed text-ink" data-testid="generated-sentence">{item.sentence}</p>
-                          {(item.collocation || item.chinese) && (
-                            <p className="vocab-wrap mt-0.5 text-xs text-mute">{generatedExplanation(item)}</p>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void save(
-                        generated.filter((_, index) => picked[index]).map(item => ({ sentence: item.sentence, source: 'AI生成', explanation: generatedExplanation(item) || null, sense: senseText || null })),
-                        () => { setGenerated([]); setPicked([]); },
-                      )}
-                      disabled={saving || pickedCount === 0}
-                      className={btnPrimary}
-                      data-testid="generated-save"
-                    >
-                      <Plus size={14} />{saving ? '正在保存…' : `存勾选的 ${pickedCount} 句`}
-                    </button>
-                    <button type="button" onClick={() => { setGenerated([]); setPicked([]); }} disabled={saving} className={btnPlain} data-testid="generated-discard">都不要</button>
-                  </div>
-                </>
-              )}
+              {genTask && <ExampleGenResult task={genTask} onSaved={onGenSaved} />}
             </div>
           )}
 
@@ -321,7 +293,7 @@ export default function ExamplesSection({ word, examples, senses, handlers, comp
             <div className="mt-2">
               <textarea
                 value={draft}
-                onChange={event => { setDraft(event.target.value); setChecked(null); setOwnError(''); }}
+                onChange={event => onDraftChange(event.target.value)}
                 onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void check(); } }}
                 rows={3}
                 maxLength={MAX_OWN_SENTENCE}
@@ -331,73 +303,18 @@ export default function ExamplesSection({ word, examples, senses, handlers, comp
                 data-testid="own-input"
               />
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" onClick={() => void check()} disabled={!modelOn || checking || !draft.trim()} className={btnPrimary} data-testid="own-check">
-                  {checking ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  {checking ? 'AI 正在看…' : '让 AI 看看'}
+                <button type="button" onClick={() => check()} disabled={!modelOn || ownLive || !draft.trim()} className={btnPrimary} data-testid="own-check">
+                  {ownLive ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  {ownLive ? 'AI 正在看…（在小窗里看进度）' : '让 AI 看看'}
                 </button>
-                {!checked && (
+                {!ownShown && (
                   <button type="button" onClick={() => void save([{ sentence: draft, source: '自己写' }], resetOwn)} disabled={saving || !draft.trim()} className={btnPlain} data-testid="own-save-direct">
                     不用看，直接存
                   </button>
                 )}
               </div>
               {ownError && <p role="alert" className="vocab-wrap mt-2 text-xs text-danger" data-testid="own-error">{ownError}</p>}
-              {checked && (
-                <div
-                  className={`mt-3 rounded-xl border p-3 text-sm ${checked.result.verdict === 'correct' ? 'border-success/30 bg-success-soft' : 'border-clay/30 bg-clay-soft'}`}
-                  data-testid="own-result"
-                  data-verdict={checked.result.verdict}
-                >
-                  <div className={`font-semibold ${checked.result.verdict === 'correct' ? 'text-success' : 'text-danger'}`} data-testid="own-verdict">{checked.result.label}</div>
-                  <p className="vocab-wrap mt-1 text-ink" data-testid="own-reason">{checked.result.reason}</p>
-                  {checked.result.changed && (
-                    <div className="mt-2">
-                      <div className="text-xs text-mute">改好的句子（只改必须改的地方）</div>
-                      <p className="vocab-wrap font-serif text-base text-ink" data-testid="own-fixed">{checked.result.fixed}</p>
-                    </div>
-                  )}
-                  {checked.result.better && (
-                    <div className="mt-2">
-                      <div className="text-xs text-mute">更地道的说法（可选）</div>
-                      <p className="vocab-wrap font-serif text-base text-ink" data-testid="own-better">{checked.result.better}</p>
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void save([{ sentence: checked.text, source: '自己写', explanation: checked.result.reason, sense: senseText || null }], resetOwn)}
-                      disabled={saving}
-                      className={checked.result.changed ? btnPlain : btnPrimary}
-                      data-testid="own-save-original"
-                    >
-                      <Check size={14} />存原句
-                    </button>
-                    {checked.result.changed && (
-                      <button
-                        type="button"
-                        onClick={() => void save([{ sentence: checked.result.fixed, source: 'AI改过', explanation: checked.result.reason, sense: senseText || null, original: checked.text }], resetOwn)}
-                        disabled={saving}
-                        className={btnPrimary}
-                        data-testid="own-save-fixed"
-                      >
-                        <Check size={14} />存改后
-                      </button>
-                    )}
-                    {checked.result.better && (
-                      <button
-                        type="button"
-                        onClick={() => void save([{ sentence: checked.result.better, source: 'AI改过', explanation: checked.result.reason, sense: senseText || null, original: checked.text }], resetOwn)}
-                        disabled={saving}
-                        className={btnPlain}
-                        data-testid="own-save-better"
-                      >
-                        存更地道的
-                      </button>
-                    )}
-                    <button type="button" onClick={resetOwn} disabled={saving} className={btnPlain} data-testid="own-discard">都不存</button>
-                  </div>
-                </div>
-              )}
+              {ownTask && <OwnCheckResult task={ownTask} onSaved={handlers.onSaved} />}
             </div>
           )}
           {saveError && <p role="alert" className="vocab-wrap mt-2 text-xs text-danger" data-testid="example-save-error">{saveError}</p>}

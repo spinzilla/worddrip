@@ -14,6 +14,7 @@ import Lookable from '../Lookable';
 import NotesSection from './NotesSection';
 import ExamplesSection, { useMyExamples } from './ExamplesSection';
 import { exampleKey, notifyExamplesChanged, reviewExampleSentence, sensesFrom } from '../../utils/vocab/examples';
+import { lockAiPanel, unlockAiPanel } from '../../utils/aiTasks';
 import './vocab.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -312,6 +313,13 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
 
   const ready = round !== null;
   const finished = ready && (questions.length === 0 || phase === 'done');
+  // 091 AI 小窗：作答中（还没判分，含复检题作答）锁住小窗，判完分或退出时解锁。
+  const answering = ready && !finished && (phase === 'write' || Object.values(rechecks).some(r => r.phase === 'preparing' || r.phase === 'answer'));
+  useEffect(() => {
+    if (!answering) return undefined;
+    lockAiPanel(firstTest ? '首考作答中' : '复习作答中');
+    return () => unlockAiPanel();
+  }, [answering, firstTest]);
   /**
    * 043 我的例句：只在整轮结束的结果页出现（防泄题：作答中、逐屏判分时都不读、不显示）。
    * 判分通过的改写/造句答案可以「存为我的例句」（来源「自己写」）；每个词还有一个收起的小入口。

@@ -100,6 +100,8 @@
   padding: 2.5rem 1rem;
 }
 .vocab-recall-overlay { z-index: 80; }
+/* 091 AI 小窗侧栏开着时，闪卡 / 复习遮罩也让出右边，不盖住小窗。 */
+.vocab-flash-overlay { right: var(--ai-dock, 0px); }
 .vocab-flash-inner { width: 100%; max-width: 40rem; min-width: 0; }
 /* 062 动画舞台：翻面/换卡时盖一张旧卡副本；动画期间裁掉溢出（滑出的卡不露到外面）。 */
 .vocab-flash-stage { position: relative; display: flow-root; }

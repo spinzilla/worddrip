@@ -104,6 +104,9 @@ function buildEnv(p, port) {
   ].join(' ');
   env.ES_LOG_DIR = p.logs;
   env.ES_E2E_ISOLATE = '1'; // 调试版不注册 http 插件，避免它把 .cookies 写进真实目录
+  // 090：要在真实窗口里测 plugin-http 的流式，必须注册插件；它会把 .cookies 写到系统目录（仓库外），
+  // 所以只在人明确设 ES_E2E_REAL_HTTP=1 时才放开，默认不变。
+  if (process.env.ES_E2E_REAL_HTTP === '1') delete env.ES_E2E_ISOLATE;
   return env;
 }
 

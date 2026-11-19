@@ -1,7 +1,7 @@
 // 083 更新前同步真实窗口：加入同步后点「现在更新」先推送；同步地址连不上时弹「仍要安装吗」。
 // 前置：node app/dev/release.mjs build --allow-dirty 打出更高版本（例如 0.11.99）到 D:\tmp\es-release\<版本>（测试完 bump 回去，不要 upload）。
 //   node dev/e2e/update-083.mjs 0.11.99
-// 同步服务器：本机起 server/sync（临时库在 D:\tmp\es-sync\），中间放一个加 CORS 头并记录请求的转发。
+// 同步服务器：本机起 server/sync（临时库在本次 D:\tmp\es-e2e 运行目录），中间放一个加 CORS 头并记录请求的转发。
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -19,9 +19,9 @@ const URL = `http://127.0.0.1:${PROXY_PORT}`;
 // 应用内置的口令优先于开发口令，所以本机测试服务器要用同一个（从 app/.env.local 读，只给本机服务器，不打印）
 let APP_KEY = 'test-app-key';
 try { const m = fs.readFileSync(path.join(here, '..', '..', '.env.local'), 'utf8').match(/^VITE_SYNC_APP_KEY=(.+)$/m); if (m) APP_KEY = m[1].trim().replace(/^["']|["']$/g, ''); } catch { /* 没有就用开发口令 */ }
-const dbFile = 'D:\\tmp\\es-sync\\e2e-083.db';
-fs.mkdirSync('D:\\tmp\\es-sync', { recursive: true });
-for (const f of [dbFile, dbFile + '-wal', dbFile + '-shm']) fs.rmSync(f, { force: true });
+const runDir = path.join('D:/tmp/es-e2e', `update-083-${Date.now()}`);
+fs.mkdirSync(runDir, { recursive: true });
+const dbFile = path.join(runDir, 'sync.db');
 const server = spawn(path.join(root, '.venv', 'Scripts', 'python.exe'), ['-m', 'uvicorn', 'app:app', '--port', String(PORT)], {
   cwd: root, env: { ...process.env, SYNC_APP_KEY: APP_KEY, SYNC_DB: dbFile }, stdio: 'ignore',
 });
@@ -44,8 +44,6 @@ for (let i = 0; i < 50; i++) {
 
 const version = process.argv[2] || '0.11.99';
 const srv = await serveRelease({ version });
-const runDir = path.join('D:/tmp/es-e2e', `update-083-${Date.now()}`);
-fs.mkdirSync(runDir, { recursive: true });
 const extra = path.join(runDir, 'tauri-update-test.json');
 fs.writeFileSync(extra, JSON.stringify({ plugins: { updater: { endpoints: [`${srv.base}/latest.json`], dangerousInsecureTransportProtocol: true } } }));
 process.env.ES_E2E_EXTRA_CONFIG = extra;

@@ -14,7 +14,7 @@ import { guardBeforeInstall } from './updateGuard';
 import { t } from './i18n';
 import {
   CHECK_EVERY_MS, CHECK_FIRST_MS, UPDATE_BASE, classifyUpdateError, compareVersions, downloadAndVerifyApk,
-  fetchAndroidManifest, isNewerAndroid, shouldShowBanner, snoozeFor, type AndroidManifest, type Snooze, type UpdateErrorCode,
+  fetchAndroidManifest, isNewerAndroid, shouldCheckOnResume, shouldShowBanner, snoozeFor, type AndroidManifest, type Snooze, type UpdateErrorCode,
 } from './updateLogic';
 
 export type Phase =
@@ -91,7 +91,10 @@ export function checkUpdate(manual = false): Promise<void> {
   if (state.phase === 'available') { set({}); return Promise.resolve(); }
   if (!['idle', 'latest', 'failed'].includes(state.phase)) return Promise.resolve();
   checking ??= (async () => {
-    set({ phase: 'checking' });
+    // 一开始检查就记时间，失败也算；否则断网时反复回前台会绕过 1 小时节流。
+    const now = Date.now();
+    ls.set(K_LAST, String(now));
+    set({ phase: 'checking', lastCheck: now });
     try {
       if (!state.current) set({ current: await appVersion() });
       let found: { version: string; notes: string; apkUrl?: string } | null = null;
@@ -104,8 +107,6 @@ export function checkUpdate(manual = false): Promise<void> {
         const u = await checkForUpdate();
         if (u && compareVersions(u.version, state.current) > 0) { update = u; found = { version: u.version, notes: u.body ?? '' }; }
       }
-      const now = Date.now();
-      ls.set(K_LAST, String(now));
       if (found) set({ phase: 'available', version: found.version, notes: found.notes, apkUrl: found.apkUrl ?? '', lastCheck: now, error: null });
       else set({ phase: 'latest', lastCheck: now });
     } catch (err) {
@@ -119,12 +120,22 @@ export function checkUpdate(manual = false): Promise<void> {
   return checking;
 }
 
-/** 启动约 10 秒后查一次，之后每 6 小时一次；设置里关了「自动检查」就不查。返回清理函数。 */
+/** 启动约 2 秒后查一次，之后每 6 小时一次；回到前台时距上次检查满 1 小时也查。 */
 export function startAutoCheck(): () => void {
   const run = () => { if (autoCheckOn()) checkUpdate(false); };
+  const onVisibility = () => {
+    if (document.visibilityState !== 'visible' || !autoCheckOn()) return;
+    const lastCheck = Number(ls.get(K_LAST)) || null;
+    if (shouldCheckOnResume(lastCheck, Date.now())) checkUpdate(false);
+  };
   const first = setTimeout(run, CHECK_FIRST_MS);
   const every = setInterval(run, CHECK_EVERY_MS);
-  return () => { clearTimeout(first); clearInterval(every); };
+  document.addEventListener('visibilitychange', onVisibility);
+  return () => {
+    clearTimeout(first);
+    clearInterval(every);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
 }
 
 type Bridge = { canInstall(): boolean; openInstallSettings(): void; installApk(path: string): string };

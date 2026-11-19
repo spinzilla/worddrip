@@ -14,6 +14,7 @@ type DefinitionsEnData = ReturnType<typeof useMyDefinitions>;
 import { definitionKey } from '../../utils/vocab/definitionEn';
 import VoiceButton from './VoiceButton';
 import { registerNoteSource } from '../../utils/quicknote/context';
+import { useAiContextWord } from '../ai/panelState';
 import { exampleKey, sensesFrom } from '../../utils/vocab/examples';
 import type { VocabExample } from '../../utils/vocab/types';
 import {
@@ -524,6 +525,7 @@ export default function EntryDetail({ selection, library, query, onOpen, onRevie
   const shown = selection?.kind === 'word' ? library.wordByKey.get(selection.id) : selection?.kind === 'listening' ? listeningByKey.get(selection.id) : undefined;
   const noteWord = shown?.word;
   const noteEntryId = shown ? selection?.id : undefined;
+  useAiContextWord(noteWord); // 091 AI 小窗直接问时带上当前词
   useEffect(() => {
     if (!noteWord) return undefined;
     return registerNoteSource({ snapshot: () => ({ kind: 'entry', entryId: noteEntryId, word: noteWord }) });

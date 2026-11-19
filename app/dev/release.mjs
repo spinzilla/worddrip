@@ -354,35 +354,106 @@ function quote(value) {
 function upload(version, dryRun) {
   semver(version);
   const dir = path.join(outputRoot, version);
-  const files = [
+  const packages = [
     `WordDrip_${version}_x64-setup.exe`,
     `WordDrip_${version}_x64-setup.exe.sig`,
     `worddrip-${version}.apk`,
-    'latest.json',
-    'android.json',
-  ].map((name) => path.join(dir, name));
-  for (const file of files) if (!fs.existsSync(file)) fail(`缺少待上传文件：${file}`);
+  ];
+  const manifests = ['latest.json', 'android.json'];
+  for (const name of [...packages, ...manifests]) {
+    if (!fs.existsSync(path.join(dir, name))) fail(`缺少待上传文件：${path.join(dir, name)}`);
+  }
   // 安装包放 <版本>/ 子目录；应用读的是根目录的 latest.json / android.json（tauri.conf.json 的 endpoints、utils/update.ts），
-  // 所以两个清单传到根目录：先传临时名，留一份存档到 <版本>/，最后 mv 成正式名，避免应用读到一半的清单。
+  // 所以两个清单最后才传：先传临时名，留一份存档到 <版本>/，再 mv 成正式名，避免应用读到一半的清单。
   const updatesRoot = '/var/www/worddrip-updates';
   const remoteDir = `${updatesRoot}/${version}`;
-  const commands = [
-    ['ssh', ['tencent', `mkdir -p ${remoteDir}`]],
-    ['scp', [...files.slice(0, 3), `tencent:${remoteDir}/`]],
-    ['scp', [files[3], `tencent:${updatesRoot}/latest.json.tmp`]],
-    ['scp', [files[4], `tencent:${updatesRoot}/android.json.tmp`]],
-    ['ssh', ['tencent', `cd ${updatesRoot} && cp latest.json.tmp ${version}/latest.json && cp android.json.tmp ${version}/android.json && mv latest.json.tmp latest.json && mv android.json.tmp android.json && chmod 644 latest.json android.json`]],
-  ];
-  for (const [command, args] of commands) {
-    if (dryRun) {
-      console.log([command, ...args].map(quote).join(' '));
-    } else {
-      // ssh/scp 是真正的 exe，不走 shell：Windows 上走 cmd 时，远程命令里的 && 会被本机 cmd 截走（0.11.0 发版时最后一步因此失败）。
-      const result = spawnSync(command, args, { cwd: repoDir, env: process.env, encoding: 'utf8', shell: false, timeout, stdio: 'inherit' });
-      if (result.error) fail(`${command} 启动失败：${result.error.message}`);
-      if (result.status !== 0) fail(`${command} 退出码 ${result.status ?? '未知'}`);
-    }
+  if (dryRun) {
+    for (const name of packages) console.log(`上传 ${name} → tencent:${remoteDir}/（大于 ${chunkSize / 1024 / 1024} MB 的切块传，传完对 sha256）`);
+    for (const name of manifests) console.log(`上传 ${name} → tencent:${updatesRoot}/${name}.tmp`);
+    console.log(`ssh tencent ${quote(publishCommand(updatesRoot, version))}`);
+    return;
   }
+  remote(`mkdir -p ${remoteDir}`);
+  for (const name of packages) uploadChecked(path.join(dir, name), remoteDir, name);
+  for (const name of manifests) scpWithRetry(path.join(dir, name), `${updatesRoot}/${name}.tmp`);
+  remote(publishCommand(updatesRoot, version));
+  console.log(`已发布 ${version}：${releaseBaseUrl}/latest.json、${releaseBaseUrl}/android.json`);
+}
+
+// 本机到服务器的线路传大文件会断（0.11.0、0.11.3 的 APK 都在十几 MB 处卡死），所以：
+// 大文件切成 4 MB 小块逐块传，每块单独超时、失败重试；服务器上拼好后对 sha256，一致才换上正式名。
+// 服务器上已有同 sha256 的文件就跳过，发版中途失败后可以直接重跑 upload。
+const chunkSize = 4 * 1024 * 1024;
+const transferTimeout = 180_000;
+const transferRetries = 4;
+
+function publishCommand(updatesRoot, version) {
+  return `cd ${updatesRoot} && cp latest.json.tmp ${version}/latest.json && cp android.json.tmp ${version}/android.json && mv latest.json.tmp latest.json && mv android.json.tmp android.json && chmod 644 latest.json android.json`;
+}
+
+function runTransfer(command, args, { allowFail = false, capture = false, timeoutMs = transferTimeout } = {}) {
+  // ssh/scp 是真正的 exe，不走 shell：Windows 上走 cmd 时，远程命令里的 && 会被本机 cmd 截走（0.11.0 发版时最后一步因此失败）。
+  const result = spawnSync(command, args, {
+    cwd: repoDir, env: process.env, encoding: 'utf8', shell: false, timeout: timeoutMs,
+    stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
+  });
+  const ok = !result.error && result.status === 0;
+  if (!ok && !allowFail) fail(`${command} 失败：${result.error ? result.error.message : `退出码 ${result.status ?? '未知'}`}`);
+  return { ok, stdout: result.stdout || '' };
+}
+
+function remote(command, options) {
+  return runTransfer('ssh', ['-o', 'ConnectTimeout=15', 'tencent', command], options);
+}
+
+function scpWithRetry(localFile, remotePath) {
+  for (let attempt = 1; attempt <= transferRetries; attempt += 1) {
+    if (runTransfer('scp', ['-q', '-o', 'ConnectTimeout=15', localFile, `tencent:${remotePath}`], { allowFail: true }).ok) return;
+    console.log(`  ${path.basename(localFile)} 第 ${attempt} 次没传完${attempt < transferRetries ? '，重试' : ''}`);
+  }
+  fail(`传不上去：${localFile}`);
+}
+
+function remoteSha(remoteFile) {
+  const { ok, stdout } = remote(`sha256sum ${remoteFile} 2>/dev/null || true`, { allowFail: true, capture: true });
+  return ok ? (stdout.trim().split(/\s+/)[0] || '') : '';
+}
+
+function uploadChecked(localFile, remoteDir, name) {
+  const buffer = fs.readFileSync(localFile);
+  const sha = createHash('sha256').update(buffer).digest('hex');
+  const target = `${remoteDir}/${name}`;
+  if (remoteSha(target) === sha) {
+    console.log(`${name}：服务器上已是同一个文件，跳过`);
+    return;
+  }
+  if (buffer.length <= chunkSize) {
+    scpWithRetry(localFile, `${target}.tmp`);
+  } else {
+    const partsDir = path.join(outputRoot, `${versionOfDir(remoteDir)}-parts`);
+    const remoteParts = `${remoteDir}/.parts-${name}`;
+    fs.rmSync(partsDir, { recursive: true, force: true });
+    fs.mkdirSync(partsDir, { recursive: true });
+    remote(`rm -rf ${remoteParts} && mkdir -p ${remoteParts}`);
+    const count = Math.ceil(buffer.length / chunkSize);
+    for (let i = 0; i < count; i += 1) {
+      const partName = `part.${String(i).padStart(3, '0')}`;
+      const partFile = path.join(partsDir, partName);
+      fs.writeFileSync(partFile, buffer.subarray(i * chunkSize, (i + 1) * chunkSize));
+      console.log(`${name}：传第 ${i + 1}/${count} 块`);
+      scpWithRetry(partFile, `${remoteParts}/${partName}`);
+    }
+    remote(`cat ${remoteParts}/part.* > ${target}.tmp && rm -rf ${remoteParts}`);
+    fs.rmSync(partsDir, { recursive: true, force: true });
+  }
+  const got = remoteSha(`${target}.tmp`);
+  if (got !== sha) fail(`${name} 传完后 sha256 对不上（本机 ${sha}，服务器 ${got || '读不到'}），没有换上正式名`);
+  remote(`mv ${target}.tmp ${target} && chmod 644 ${target}`);
+  console.log(`${name}：已上传，sha256 一致`);
+}
+
+function versionOfDir(remoteDir) {
+  return path.posix.basename(remoteDir);
 }
 
 function usage() {

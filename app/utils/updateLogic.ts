@@ -3,8 +3,13 @@
 
 export const UPDATE_BASE = 'https://vocab.uestceee.art/worddrip-updates';
 export const SNOOZE_MS = 24 * 60 * 60 * 1000;
-export const CHECK_FIRST_MS = 10_000;
+export const CHECK_FIRST_MS = 2_000;
 export const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+export const CHECK_RESUME_MS = 60 * 60 * 1000;
+
+/** 回到前台时，从没查过或距上次检查（失败也算）已满 1 小时才查。 */
+export const shouldCheckOnResume = (lastCheck: number | null, now: number): boolean =>
+  lastCheck === null || now - lastCheck >= CHECK_RESUME_MS;
 
 export type UpdateErrorCode = 'network' | 'checksum' | 'space' | 'unknown';
 export class UpdateError extends Error {

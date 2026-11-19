@@ -184,6 +184,7 @@ try {
 
   // 3. 教练错误档案：我写的 / 改法里的英文也可查。
   await page.clickText('教练');
+  await page.click('[data-testid=coach-tab-errors]'); // 096：教练页分了小标签，默认是写作练习
   await page.waitFor('[data-testid=coach-item]');
   // 教练页按最近一批在前（019 起就是这样），默认展开的是 2026-01-04 那批，第一条「我写的」是 ever day。
   const beforeCoach = modelCalls.filter(call => call.kind === 'lookup').length;

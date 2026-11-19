@@ -25,6 +25,7 @@ import { definitionKey } from '../../utils/vocab/definitionEn';
 import SceneTag, { useExampleScenes } from './SceneTag';
 import VoiceButton from './VoiceButton';
 import Lookable, { findWordAt } from '../Lookable';
+import { useAiContextWord } from '../ai/panelState';
 import { exampleKey, sensesFrom } from '../../utils/vocab/examples';
 import { IS_MOBILE } from '../../utils/platform';
 import './vocab.css';
@@ -67,6 +68,7 @@ export default function Flashcards({ initial, onExit }: Props) {
   const myDefinitionsEn = useMyDefinitions();
   const scenes = useExampleScenes();
   const word: DueWord = currentCard(state);
+  useAiContextWord(word.word); // 091 AI 小窗直接问时带上当前词
   const storedDefinitionsEn = myDefinitionsEn.byKey.get(definitionKey(word.word)) ?? [];
 
   // 048：翻到背面时，给这个词还没标过的例句补场景标签（一个词一次请求；标过、试过的不再发）。

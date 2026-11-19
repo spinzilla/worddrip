@@ -15,6 +15,7 @@ try {
   page = await connect({ port: session.port });
   await page.waitReady('nav button');
   await page.clickText('教练');
+  await page.click('[data-testid=coach-tab-errors]'); // 096：教练页分了小标签，默认是写作练习
   await page.waitFor('[data-testid="coach-empty"]');
   await page.waitText('词库 → 导入');
   await page.waitText('不影响错误档案浏览');
