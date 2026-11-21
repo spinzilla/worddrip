@@ -167,7 +167,7 @@ try {
   await shot(page, '05-upgrades-view.png', false);
   evidence.checks.upgrades = { groups: list.filter(r => r.kind === 'upgrade').length, selfChecks: list.filter(r => r.kind === 'selfCheck').length };
 
-  // 7. 状态筛选：复习中只剩 L1–L4。
+  // 7. 状态筛选：复习中包含 L1–L7；保温中只看 L5–L7。
   await tab(page, '查词');
   await page.evaluate(() => {
     const el = document.querySelector('[data-testid=status-filter]');
@@ -176,9 +176,16 @@ try {
   });
   await page.waitUntil('筛选生效', `/匹配 \\d+ \\/ 共/.test(document.querySelector('[data-testid=vocab-count]').innerText)`);
   list = await rows(page);
-  const learningWords = new Set(browse.reviewWords.filter(w => /^L[1-4]$/.test(w.status.trim())).map(w => w.word.trim().toLowerCase()));
-  assert.equal(list.length, learningWords.size, '复习中筛选：L1–L4 的词（同词多期合并）');
-  assert.ok(list.every(r => /L[1-4]/.test(r.text)));
+  const learningWords = new Set(browse.reviewWords.filter(w => /^L[1-7]$/.test(w.status.trim())).map(w => w.word.trim().toLowerCase()));
+  assert.equal(list.length, learningWords.size, '复习中筛选：L1–L7 的词（同词多期合并）');
+  assert.ok(list.every(r => /L[1-7]|保温/.test(r.text)));
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-testid=status-filter]');
+    el.value = 'warming';
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const warmingWords = new Set(browse.reviewWords.filter(w => /^L[5-7]$/.test(w.status.trim())).map(w => w.word.trim().toLowerCase()));
+  assert.equal((await rows(page)).length, warmingWords.size, '保温中筛选只含 L5–L7');
   await page.evaluate(() => {
     const el = document.querySelector('[data-testid=status-filter]');
     el.value = 'all';

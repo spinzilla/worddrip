@@ -168,6 +168,22 @@ const fixturePath = name => join(appDir, 'dev', 'fixtures', 'vocab', 'export', n
 const scenarios = [];
 scenarios.push(runRoundTrip('fixture', fixturePath('upgrade.md'), fixturePath('review.md')));
 
+const longTermReview = join(runDir, 'long-term-review-source.md');
+writeFileSync(longTermReview, [
+  '# 词汇总词库', '## 总词库',
+  '| 单词 | 期号 | 入库日期 | 状态 | 下次到期 | 备注 |', '|---|---|---|---|---|---|',
+  '| long-one | 11.20 | 2026-11-20 | L5 | 2027-01-04 | 保温 1 |',
+  '| long-two | 11.20 | 2026-11-20 | L6 | 2027-02-18 | 保温 2 |',
+  '| long-three | 11.20 | 2026-11-20 | L7 | 2027-05-19 | 保温 3 |',
+  '',
+].join('\n'), 'utf8');
+const longTerm = runRoundTrip('long-term-roundtrip', fixturePath('upgrade.md'), longTermReview);
+const longTermOutput = readFileSync(join(longTerm.runDir ?? runDir, 'long-term-roundtrip', 'review-export.md'), 'utf8');
+const longTermParsed = parseReviewLibrary(longTermOutput);
+assert.deepEqual(longTermParsed.words.map(word => [word.status, word.level, word.due]), [
+  ['L5', 5, '2027-01-04'], ['L6', 6, '2027-02-18'], ['L7', 7, '2027-05-19'],
+], 'Markdown 往返必须保留 L5–L7 状态和到期日');
+
 // 标准 6：D:\english 是真实来源，只读复制到临时目录；可用环境变量指定换机后的来源根目录。
 const realSourceDir = process.env.ES_VOCAB_REAL_SOURCE_DIR || 'D:\\english';
 scenarios.push(runRoundTrip(

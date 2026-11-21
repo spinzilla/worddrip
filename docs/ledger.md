@@ -213,3 +213,5 @@
 - 2026/11/17 20:37:57 095-写作练习-出题批改与记录：实现 @codex-k3，验收 @opencode-luna，通过（返工 0 次），花费 151,013 token，待 Claude 复核
 - 2026-11-18 096 写作练习界面：实现 @claude-sonnet；教练页分三个小标签（写作练习默认/作文批改/错误档案，记住上次选的）；新增写作练习页（场景、题目卡、建议用词、作答草稿自动存、批改结果块页面与小窗共用、再写一版留旧批改、存成例句、历史可开可删）；tsc、build、test-writing、test-ai-tasks、smoke、coach、coach-review、091、093、writing-096 真实窗口脚本通过，截图已看；theme/click-lookup/manual-add 三个旧夹具只改了选择器、未重跑，待独立验收
 - 2026/11/17 21:10:07 096-写作练习界面：实现 @claude-sonnet，验收 @opencode-ds-flash，通过但有 1 条警告（返工 0 次），花费 $3.61，待你看
+- 2026-11-20 097 已掌握改长期保温复习：实现 @opencode-luna；L4 后加 L5–L7、首考答对进 L3、迁移 v15 重建 review_word 并保留关联数据；更新中英状态、筛选、导入导出与写作挑词；cargo vocab 161 通过/2 忽略、全部 test-vocab、test-writing、tsc/build 通过；隔离真实窗口迁移/复习/保温筛选和 390 截图通过；只读真实库计数 42，未改库；安卓/Mac/实时同步未测，待独立验收
+- 2026/11/20 09:24:48 097-已掌握改长期保温复习：实现 @opencode-luna，验收 @opencode-ds-flash，通过但有 6 条警告（返工 0 次），待你看

@@ -212,7 +212,7 @@ export default function DuePanel({ refreshKey, startRequest = 0 }: Props) {
 
       {!error && !loading && count === 0 && (
         <p className="mt-3 rounded-xl bg-page p-3 text-sm text-mute" data-testid="due-empty">
-          今天没有到期的词。只有 L1–L4 且下次到期不晚于今天的复习词会出现在这里。
+          今天没有到期的词。只有 L1–L7 且下次到期不晚于今天的复习词会出现在这里。
         </p>
       )}
 

@@ -218,6 +218,7 @@ try {
   assert.equal(m.describeChange({ status: 'L4', due: '2026-11-09' }, { status: '✅已掌握', due: '', changed: true }), 'L4 → 已掌握');
   // 042：界面不显示表情，首考的「🌱待考察」也只显示文字。
   assert.equal(m.describeChange({ status: '🌱待考察', due: '' }, { status: '🧊冷库', due: '', changed: true }), '待考察 → 冷库');
+  assert.equal(m.describeChange({ status: 'L4', due: '2026-11-09' }, { status: 'L5', due: '2027-01-04', changed: true }, 'en'), 'L4 → Long-term 1, due 01-04');
   assert.match(m.describeChange({ status: 'L1', due: '2026-11-11' }, { status: 'L1', due: '2026-11-11', changed: false }), /^不变（今天已计入，不再升级）：L1，到期 11-11$/);
 
   // ---------------------------------------------------------------- 「这题出错了」不再出这道题面 + 复检要新语境

@@ -81,10 +81,11 @@ try {
     browseWord('master', 'mastered', '✅已掌握', [definition('already known')], '2026-11-05'),
     browseWord('empty', 'empty', 'L1', [definition('')], '2026-11-06'),
     browseWord('late', 'late', 'L2', [definition('after the expected time')], '2026-11-04', '2026-12-01'),
+    browseWord('warming', 'warming', 'L5', [definition('long-term retention')], '2026-11-08', '2027-01-04'),
     browseWord('soon', 'soon', 'L2', [definition('before long')], '2026-11-04', '2026-11-18'),
     browseWord('new', 'new', 'L1', [definition('recently made')], '2026-11-07'),
   ]);
-  assert.deepEqual(picked.map(item => item.word), ['new', 'soon', 'late']);
+  assert.deepEqual(picked.map(item => item.word), ['warming', 'new', 'soon'], '保温中的词仍可被写作练习挑选');
   assert.ok(!picked.some(item => ['mastered', 'empty'].includes(item.word)));
   assert.equal(m.P.pickWritingWords([browseWord('one', 'only', 'L1', [definition('single')])]).length, 1);
   assert.deepEqual(m.P.pickWritingWords([]), []);

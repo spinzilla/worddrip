@@ -36,7 +36,7 @@ export interface ReviewWord {
   issue: string;
   addedAt: string;
   status: string;
-  level: 1 | 2 | 3 | 4 | null;
+  level: 1 | 2 | 3 | 4 | 5 | 6 | 7 | null;
   due: string;
   note: string;
 }
@@ -306,7 +306,7 @@ export interface ReviewSubmitResult extends ReviewSubmitRequest {
   reviewDate: string;
   changed: boolean;
   status: string;
-  level: 1 | 2 | 3 | 4 | null;
+  level: 1 | 2 | 3 | 4 | 5 | 6 | 7 | null;
   due: string;
   note: string;
 }

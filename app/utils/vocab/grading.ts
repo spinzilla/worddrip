@@ -208,9 +208,13 @@ export function finalizeGrade(question: Pick<RecallQuestion, 'target'>, written:
 export function describeChange(
   before: { status: string; due: string } | undefined,
   after: { status: string; due: string; changed: boolean },
+  lang: 'zh' | 'en' = 'zh',
 ): string {
   const shortDue = (due: string) => (due ? due.slice(5) : '');
-  const to = after.due ? `${statusLabel(after.status)}，到期 ${shortDue(after.due)}` : statusLabel(after.status);
-  if (!after.changed) return `不变（今天已计入，不再升级）：${to}`;
-  return before ? `${statusLabel(before.status)} → ${to}` : to;
+  const label = (status: string) => statusLabel(status, lang);
+  const to = after.due
+    ? lang === 'zh' ? `${label(after.status)}，到期 ${shortDue(after.due)}` : `${label(after.status)}, due ${shortDue(after.due)}`
+    : label(after.status);
+  if (!after.changed) return lang === 'zh' ? `不变（今天已计入，不再升级）：${to}` : `Unchanged (already counted today): ${to}`;
+  return before ? `${label(before.status)} → ${to}` : to;
 }

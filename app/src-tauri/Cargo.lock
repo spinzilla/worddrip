@@ -2307,7 +2307,7 @@ dependencies = [
 
 [[package]]
 name = "linguaclip"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "chrono",
  "flate2",

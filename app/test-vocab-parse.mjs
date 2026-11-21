@@ -107,22 +107,21 @@ const reviewRows = rows => [
   ...rows,
 ].join('\n');
 const syntheticReview = parseReviewLibrary(reviewRows([
-  '|  Foo   BAR  | X | 2026-01-01 | L5 | — | first |',
+  '|  Foo   BAR  | X | 2026-01-01 | L5 | 2026-02-15 | first |',
   '| foo bar | X | 2026-01-02 | L1 | 2026-01-03 | second |',
   '| too | many | columns | here | yes | no | extra |',
 ]));
 assert.equal(syntheticReview.words.length, 2);
 assert.deepEqual(syntheticReview.words.map(word => word.id), ['rv:foo bar@X#1', 'rv:foo bar@X#2']);
 assert.equal(syntheticReview.words[0].status, 'L5');
-assert.equal(syntheticReview.words[0].level, null);
+assert.equal(syntheticReview.words[0].level, 5);
 assert.equal(syntheticReview.words[1].level, 1);
 assert.deepEqual(syntheticReview.warnings.map(warning => [warning.line, warning.kind]), [
-  [4, 'status'],
   [5, 'duplicate'],
   [6, 'columns'],
 ]);
 
-for (const [status, level] of [['🌱待考察', null], ['✅已掌握', null], ['🧊冷库', null], ['L1', 1], ['L2', 2], ['L3', 3], ['L4', 4]]) {
+for (const [status, level] of [['🌱待考察', null], ['✅已掌握', null], ['🧊冷库', null], ['L1', 1], ['L2', 2], ['L3', 3], ['L4', 4], ['L5', 5], ['L6', 6], ['L7', 7]]) {
   const result = parseReviewLibrary(reviewRows([`| word | X | date | ${status} | — | note |`]));
   assert.equal(result.words[0].level, level);
   assert.equal(result.warnings.length, 0, `${status} 是已知状态`);

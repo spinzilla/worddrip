@@ -3,7 +3,7 @@ import type { BrowseReviewWord } from './types';
 /**
  * 到期复习的筛选规则（014）。
  *
- * 只认「状态是 L1–L4、level 字段与状态一致、下次到期是合法日期、且不晚于本机今天」的记录。
+ * 只认「状态是 L1–L7、level 字段与状态一致、下次到期是合法日期、且不晚于本机今天」的记录。
  * 待考察、已掌握、冷库、空日期（— 或空串）、无效日期一律不进入。
  * 日期一律按「本机自然日」比较：不用 toISOString（那是 UTC），也不把 YYYY-MM-DD 当成 UTC 时刻解析。
  * 软删除的记录在 Rust 查询（vocab_browse）里已经排除，这里拿到的都是未删除的。
@@ -48,10 +48,10 @@ export function daysBetween(a: string, b: string): number {
   return Math.round(toDay(b) - toDay(a));
 }
 
-/** 状态里的 L 级：只认 L1–L4，其他返回 null。 */
-export function statusLevel(status: string): 1 | 2 | 3 | 4 | null {
-  const match = /^L([1-4])$/.exec(status.trim());
-  return match === null ? null : Number(match[1]) as 1 | 2 | 3 | 4;
+/** 状态里的 L 级：只认 L1–L7，其他返回 null。 */
+export function statusLevel(status: string): 1 | 2 | 3 | 4 | 5 | 6 | 7 | null {
+  const match = /^L([1-7])$/.exec(status.trim());
+  return match === null ? null : Number(match[1]) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
 }
 
 export interface DueWord extends BrowseReviewWord {

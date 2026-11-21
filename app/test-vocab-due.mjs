@@ -14,7 +14,7 @@ rmSync(out, { force: true });
 
 let ord = 0;
 const word = (id, status, due, extra = {}) => {
-  const level = /^L([1-4])$/.exec(status);
+  const level = /^L([1-7])$/.exec(status);
   ord += 1;
   return {
     id, ord, line: ord + 4, raw: '', word: id.split('@')[0], issue: id.split('@')[1] ?? '9.1', addedAt: '2026-10-01',
@@ -48,7 +48,10 @@ assert.equal(d.daysBetween('2026-11-05', '2026-11-05'), 0);
 // ---- 状态 → L 级 ----
 assert.equal(d.statusLevel('L1'), 1);
 assert.equal(d.statusLevel('L4'), 4);
-for (const s of ['L0', 'L5', 'l2', '🌱待考察', '✅已掌握', '🧊冷库', '', 'L1x']) assert.equal(d.statusLevel(s), null, s);
+assert.equal(d.statusLevel('L5'), 5);
+assert.equal(d.statusLevel('L6'), 6);
+assert.equal(d.statusLevel('L7'), 7);
+for (const s of ['L0', 'L8', 'l2', '🌱待考察', '✅已掌握', '🧊冷库', '', 'L1x']) assert.equal(d.statusLevel(s), null, s);
 
 // ---- 筛选：昨天、今天、明天，各种不该进入的情况 ----
 const words = [
@@ -67,12 +70,15 @@ const words = [
   word('lastyear@1', 'L4', '2025-12-31'),
   word('lastmonth@1', 'L1', '2026-10-31'),
   word('spaces@1', 'L1', ' 2026-11-05 '),
+  word('warm5@1', 'L5', '2026-11-05'),
+  word('warm6@1', 'L6', '2026-11-06'),
+  word('warm7@1', 'L7', '2026-11-04'),
 ];
 const queue = d.dueQueue(words, TODAY);
-assert.deepEqual(ids(queue), ['lastyear@1', 'lastmonth@1', 'yesterday@1', 'today@1', 'spaces@1']);
-assert.deepEqual(queue.map(w => w.overdueDays), [309, 5, 1, 0, 0]);
-assert.equal(queue[4].due, '2026-11-05', '首尾空白的日期去掉空白后显示');
-assert.equal(d.dueLabel(queue[3]), '今天到期');
+assert.deepEqual(ids(queue), ['lastyear@1', 'lastmonth@1', 'yesterday@1', 'warm7@1', 'today@1', 'spaces@1', 'warm5@1']);
+assert.deepEqual(queue.map(w => w.overdueDays), [309, 5, 1, 1, 0, 0, 0]);
+assert.equal(queue[5].due, '2026-11-05', '首尾空白的日期去掉空白后显示');
+assert.equal(d.dueLabel(queue[4]), '今天到期');
 assert.equal(d.dueLabel(queue[2]), '逾期 1 天');
 
 // 合法闰日：在 2024-02-29 当天到期；在 2024-02-28 还没到期。

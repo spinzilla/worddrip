@@ -136,6 +136,9 @@ fn validate_word(word: &ReviewWordInput) -> Result<(), String> {
     "L2" => Some(2),
     "L3" => Some(3),
     "L4" => Some(4),
+    "L5" => Some(5),
+    "L6" => Some(6),
+    "L7" => Some(7),
     "🌱待考察" | "✅已掌握" | "🧊冷库" => None,
     _ => return Err(format!("复习库 {} 的状态未知：{}", word.id, word.status)),
   };

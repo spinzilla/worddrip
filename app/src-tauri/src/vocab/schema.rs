@@ -1,7 +1,8 @@
+use chrono::{Local, SecondsFormat, Utc};
 use rusqlite::{Connection, Error, ffi};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i32 = 14;
+pub const SCHEMA_VERSION: i32 = 15;
 
 const CREATE_V1_SCHEMA: &str = r#"
 CREATE TABLE upgrade_entry (
@@ -307,6 +308,30 @@ CREATE TABLE IF NOT EXISTS daily_plan (
 );
 "#;
 
+/// 097：复习词允许保温级 L5–L7；SQLite 不能直接改 CHECK，需重建表且保留所有关联行。
+const CREATE_REVIEW_WORD_V15: &str = r#"
+CREATE TABLE review_word_v15 (
+  id TEXT PRIMARY KEY,
+  ord INTEGER NOT NULL,
+  line INTEGER NOT NULL,
+  raw TEXT NOT NULL,
+  word TEXT NOT NULL,
+  word_norm TEXT NOT NULL,
+  issue TEXT NOT NULL,
+  added_at TEXT NOT NULL,
+  status TEXT NOT NULL,
+  level INTEGER CHECK (level IS NULL OR level BETWEEN 1 AND 7),
+  due TEXT NOT NULL,
+  note TEXT NOT NULL,
+  imported_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0 CHECK (deleted IN (0, 1)),
+  source TEXT NOT NULL DEFAULT 'Hermes 词库',
+  verification_status TEXT NOT NULL DEFAULT '未查证'
+    CHECK (verification_status IN ('未查证', '词典或ACL已查', '老师确认'))
+);
+"#;
+
 pub fn db_path() -> PathBuf {
   crate::paths::app_data_dir().join("vocab.db")
 }
@@ -428,7 +453,92 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     tx.pragma_update(None, "user_version", 14)?;
     tx.commit()?;
   }
+  if version <= 14 {
+    migrate_v15(conn)?;
+  }
   Ok(())
+}
+
+fn stable_spread_days(id: &str) -> i64 {
+  // FNV-1a：跨进程、跨设备稳定，不依赖随机数或数据库行顺序。
+  let hash = id.as_bytes().iter().fold(0xcbf29ce484222325_u64, |hash, byte| {
+    (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+  });
+  (hash % 60) as i64
+}
+
+fn migrate_v15(conn: &Connection) -> rusqlite::Result<()> {
+  let today = Local::now().date_naive();
+  let today_text = today.format("%Y-%m-%d").to_string();
+  migrate_v15_at(conn, &today_text)
+}
+
+fn migrate_v15_at(conn: &Connection, today: &str) -> rusqlite::Result<()> {
+  let foreign_keys: i32 = conn.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
+  // 关闭必须发生在事务外；SQLite 在事务内修改 foreign_keys 会静默无效。
+  conn.pragma_update(None, "foreign_keys", "OFF")?;
+  let result = (|| {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(CREATE_REVIEW_WORD_V15)?;
+    tx.execute_batch(
+      "INSERT INTO review_word_v15 (
+         id, ord, line, raw, word, word_norm, issue, added_at, status, level, due,
+         note, imported_at, updated_at, deleted, source, verification_status
+       ) SELECT
+         id, ord, line, raw, word, word_norm, issue, added_at, status, level, due,
+         note, imported_at, updated_at, deleted, source, verification_status
+       FROM review_word;
+       DROP TABLE review_word;
+       ALTER TABLE review_word_v15 RENAME TO review_word;
+       CREATE INDEX review_word_norm ON review_word(word_norm);
+       CREATE INDEX review_word_due ON review_word(level, due);",
+    )?;
+    // 原同步触发器属于旧表，重新建回；review_word 以文本 id 同步，不含 sync_uid。
+    super::sync::migrate_v12(&tx)?;
+
+    let ids = {
+      let mut stmt = tx.prepare("SELECT id, note FROM review_word WHERE status = '✅已掌握' AND deleted = 0 ORDER BY id")?;
+      let rows = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+      rows
+    };
+    let now = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    for (id, note) in ids {
+      let due = today
+        .parse::<chrono::NaiveDate>()
+        .map_err(|_| Error::InvalidQuery)?
+        .checked_add_signed(chrono::Duration::days(7 + stable_spread_days(&id)))
+        .ok_or(Error::InvalidQuery)?
+        .format("%Y-%m-%d")
+        .to_string();
+      let migration_note = format!("{today} 已掌握转入保温复习");
+      let note = if note.trim().is_empty() { migration_note } else { format!("{note}；{migration_note}") };
+      tx.execute(
+        "UPDATE review_word SET status = 'L5', level = 5, due = ?2, note = ?3, updated_at = ?4 WHERE id = ?1",
+        rusqlite::params![id, due, note, now],
+      )?;
+    }
+    let violations = {
+      let mut stmt = tx.prepare("PRAGMA foreign_key_check")?;
+      let rows = stmt.query_map([], |row| {
+        Ok(format!("表 {} 行 {:?} 引用 {}", row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?, row.get::<_, String>(2)?))
+      })?.collect::<rusqlite::Result<Vec<_>>>()?;
+      rows
+    };
+    if !violations.is_empty() {
+      return Err(Error::SqliteFailure(
+        ffi::Error::new(ffi::SQLITE_CONSTRAINT_FOREIGNKEY),
+        Some(format!("v15 外键检查失败：{}", violations.join("；"))),
+      ));
+    }
+    tx.pragma_update(None, "user_version", 15)?;
+    tx.commit()
+  })();
+
+  // 即使迁移失败也恢复外键约束；正常打开的应用库迁移后必须保持 ON。
+  let restore = conn.pragma_update(None, "foreign_keys", if result.is_ok() || foreign_keys != 0 { "ON" } else { "OFF" });
+  result?;
+  restore
 }
 
 #[cfg(test)]
@@ -485,6 +595,41 @@ mod tests {
       INSERT INTO vocab_note (word_key, word, body, source, created_at, updated_at) VALUES ('k', 'k', 'n1', '词库', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
       INSERT INTO quick_note (body, created_at, updated_at, device_id) VALUES ('q1', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 'dev');
       INSERT INTO review_log (word_id, review_date, kind, correct, before_status, after_status, before_due, after_due, created_at) VALUES ('rv:1', '2026-01-01', 'recall', 1, 'L1', 'L2', '', '', '2026-01-01T00:00:00Z');
+    "#).unwrap();
+  }
+
+  fn make_v14(path: &std::path::Path) {
+    make_v11(path);
+    let conn = Connection::open(path).unwrap();
+    conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+    conn.execute_batch(CREATE_V13_SCHEMA).unwrap();
+    conn.execute_batch(CREATE_V14_SCHEMA).unwrap();
+    super::super::sync::migrate_v12(&conn).unwrap();
+    conn.pragma_update(None, "user_version", 14).unwrap();
+    for (id, status, level, due, note) in [
+      ("rv:mastered-a", "✅已掌握", None, "", "a note"),
+      ("rv:mastered-b", "✅已掌握", None, "", ""),
+      ("rv:cold", "🧊冷库", None, "", "cold note"),
+      ("rv:seed", "🌱待考察", None, "", "seed note"),
+      ("rv:l2", "L2", Some(2), "2026-02-01", "L2 note"),
+    ] {
+      insert_review_word(&conn, id, level).unwrap();
+      conn.execute(
+        "UPDATE review_word SET status = ?2, level = ?3, due = ?4, note = ?5 WHERE id = ?1",
+        params![id, status, level, due, note],
+      ).unwrap();
+    }
+    conn.execute_batch(r#"
+      INSERT INTO review_definition VALUES ('rv:mastered-a', 'source.md', 3, 'adj.', 'known', '已知');
+      INSERT INTO review_definition_example VALUES ('rv:mastered-a', 'source.md', 3, 1, 'A known example.', 0);
+      INSERT INTO review_log (word_id, review_date, kind, correct, before_status, after_status, before_due, after_due, created_at)
+        VALUES ('rv:mastered-a', '2026-01-01', 'recall', 1, 'L6', 'L7', '', '', 't1');
+      INSERT INTO review_event (word_id, review_date, kind, correct, detail, created_at)
+        VALUES ('rv:mastered-a', '2026-01-01', 'recheck', 1, 'keep', 't1');
+      INSERT INTO vocab_note (word_key, word, body, source, created_at, updated_at)
+        VALUES ('mastered-a', 'mastered-a', 'keep note', '词库', 't1', 't1');
+      INSERT INTO vocab_example (word_key, word, sentence, source, created_at)
+        VALUES ('mastered-a', 'mastered-a', 'Keep this example.', '自己写', 't1');
     "#).unwrap();
   }
 
@@ -957,22 +1102,88 @@ mod tests {
   }
 
   #[test]
-  fn review_word_level_accepts_null_and_one_to_four_only() {
+  fn review_word_level_accepts_null_and_one_to_seven_only() {
     let conn = memory_db();
     migrate(&conn).unwrap();
 
-    assert!(insert_review_word(&conn, "rv:too-high", Some(5)).is_err());
+    assert!(insert_review_word(&conn, "rv:too-high", Some(8)).is_err());
     insert_review_word(&conn, "rv:null", None).unwrap();
-    insert_review_word(&conn, "rv:three", Some(3)).unwrap();
+    for level in 1..=7 {
+      insert_review_word(&conn, &format!("rv:level-{level}"), Some(level)).unwrap();
+    }
     let levels: Vec<Option<i32>> = {
-      let mut stmt = conn.prepare("SELECT level FROM review_word ORDER BY id").unwrap();
+      let mut stmt = conn.prepare("SELECT level FROM review_word WHERE id != 'rv:null' ORDER BY level").unwrap();
       stmt
         .query_map([], |row| row.get(0))
         .unwrap()
         .collect::<rusqlite::Result<Vec<_>>>()
         .unwrap()
     };
-    assert_eq!(levels, [None, Some(3)]);
+    assert_eq!(levels, (1..=7).map(Some).collect::<Vec<_>>());
+  }
+
+  #[test]
+  fn v15_migrates_mastered_words_once_and_preserves_all_children() {
+    let path = std::env::temp_dir().join(format!("vocab-v15-{}.db", uuid::Uuid::new_v4()));
+    make_v14(&path);
+    let conn = Connection::open(&path).unwrap();
+    conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+    let counts = |conn: &Connection| -> Vec<i64> {
+      ["review_definition", "review_definition_example", "review_log", "review_event", "vocab_note", "vocab_example"]
+        .iter()
+        .map(|table| conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0)).unwrap())
+        .collect()
+    };
+    let before_counts = counts(&conn);
+
+    migrate_v15_at(&conn, "2026-11-20").unwrap();
+
+    assert_eq!(conn.query_row("PRAGMA user_version", [], |row| row.get::<_, i32>(0)).unwrap(), 15);
+    assert_eq!(counts(&conn), before_counts, "例句、笔记、复习日志及关联行都必须保留");
+    for id in ["rv:mastered-a", "rv:mastered-b"] {
+      let (status, level, due, note): (String, i64, String, String) = conn.query_row(
+        "SELECT status, level, due, note FROM review_word WHERE id = ?1", [id],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+      ).unwrap();
+      let date = chrono::NaiveDate::parse_from_str(&due, "%Y-%m-%d").unwrap();
+      let days = (date - chrono::NaiveDate::parse_from_str("2026-11-20", "%Y-%m-%d").unwrap()).num_days();
+      assert_eq!((status.as_str(), level), ("L5", 5));
+      assert!((7..=66).contains(&days), "迁移日期应在 7–66 天内：{due}");
+      assert!(note.contains("2026-11-20 已掌握转入保温复习"));
+      let expected = 7 + stable_spread_days(id);
+      assert_eq!(days, expected, "同一 id 每次稳定落到同一天");
+    }
+    for (id, status, level, due, note) in [
+      ("rv:cold", "🧊冷库", None, "", "cold note"),
+      ("rv:seed", "🌱待考察", None, "", "seed note"),
+      ("rv:l2", "L2", Some(2), "2026-02-01", "L2 note"),
+    ] {
+      let row: (String, Option<i64>, String, String) = conn.query_row(
+        "SELECT status, level, due, note FROM review_word WHERE id = ?1", [id],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+      ).unwrap();
+      assert_eq!(row, (status.into(), level, due.into(), note.into()));
+    }
+    assert!(conn.prepare("PRAGMA foreign_key_check").unwrap().query([]).unwrap().next().unwrap().is_none());
+    for level in 5..=7 {
+      insert_review_word(&conn, &format!("rv:write-{level}"), Some(level)).unwrap();
+    }
+    assert!(insert_review_word(&conn, "rv:write-8", Some(8)).is_err());
+
+    let before_repeat: Vec<(String, String, Option<i64>, String, String)> = {
+      let mut stmt = conn.prepare("SELECT id, status, level, due, note FROM review_word ORDER BY id").unwrap();
+      stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)))
+        .unwrap().collect::<rusqlite::Result<Vec<_>>>().unwrap()
+    };
+    migrate(&conn).unwrap();
+    let after_repeat: Vec<(String, String, Option<i64>, String, String)> = {
+      let mut stmt = conn.prepare("SELECT id, status, level, due, note FROM review_word ORDER BY id").unwrap();
+      stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)))
+        .unwrap().collect::<rusqlite::Result<Vec<_>>>().unwrap()
+    };
+    assert_eq!(after_repeat, before_repeat, "版本号已升到 15，重复启动不再改动数据");
+    drop(conn);
+    std::fs::remove_file(path).unwrap();
   }
 
   #[test]

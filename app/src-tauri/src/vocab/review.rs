@@ -92,7 +92,7 @@ fn next_state(
     match status {
         "✅已掌握" => return Err("词条已掌握，不能复习".into()),
         "🧊冷库" => return Err("词条在冷库中，不能复习".into()),
-        "🌱待考察" | "L1" | "L2" | "L3" | "L4" => {}
+        "🌱待考察" | "L1" | "L2" | "L3" | "L4" | "L5" | "L6" | "L7" => {}
         _ => return Err(format!("词条状态无法复习：{status}")),
     }
     if kind == ReviewKind::Choice || already_reviewed {
@@ -108,9 +108,9 @@ fn next_state(
             next.due = plus_days(today, 2)?;
             next.note = format!("{note}；{today} 首考前看过释义");
         } else if correct {
-            next.status = "✅已掌握".into();
-            next.level = None;
-            next.due.clear();
+            next.status = "L3".into();
+            next.level = Some(3);
+            next.due = plus_days(today, 8)?;
             next.note = format!("{note}；{today} 首考过");
         } else {
             next.status = "L1".into();
@@ -121,9 +121,15 @@ fn next_state(
     }
 
     if !correct {
-        next.status = "L1".into();
-        next.level = Some(1);
-        next.due = plus_days(today, 2)?;
+        if matches!(status, "L5" | "L6" | "L7") {
+            next.status = "L3".into();
+            next.level = Some(3);
+            next.due = plus_days(today, 8)?;
+        } else {
+            next.status = "L1".into();
+            next.level = Some(1);
+            next.due = plus_days(today, 2)?;
+        }
         return Ok(next);
     }
     match status {
@@ -143,6 +149,21 @@ fn next_state(
             next.due = plus_days(today, 16)?;
         }
         "L4" => {
+            next.status = "L5".into();
+            next.level = Some(5);
+            next.due = plus_days(today, 45)?;
+        }
+        "L5" => {
+            next.status = "L6".into();
+            next.level = Some(6);
+            next.due = plus_days(today, 90)?;
+        }
+        "L6" => {
+            next.status = "L7".into();
+            next.level = Some(7);
+            next.due = plus_days(today, 180)?;
+        }
+        "L7" => {
             next.status = "✅已掌握".into();
             next.level = None;
             next.due.clear();
@@ -452,14 +473,14 @@ mod tests {
         }
         let cases = [
             Case {
-                name: "待考察答对",
+                name: "待考察不看释义答对",
                 today: TODAY,
                 status: "🌱待考察",
                 level: None,
                 correct: true,
-                expected_status: "✅已掌握",
-                expected_level: None,
-                expected_due: "",
+                expected_status: "L3",
+                expected_level: Some(3),
+                expected_due: "2026-11-17",
                 expected_note: "旧备注；2026-11-09 首考过",
             },
             Case {
@@ -512,6 +533,39 @@ mod tests {
                 status: "L4",
                 level: Some(4),
                 correct: true,
+                expected_status: "L5",
+                expected_level: Some(5),
+                expected_due: "2026-12-24",
+                expected_note: "旧备注",
+            },
+            Case {
+                name: "L5答对",
+                today: TODAY,
+                status: "L5",
+                level: Some(5),
+                correct: true,
+                expected_status: "L6",
+                expected_level: Some(6),
+                expected_due: "2027-02-07",
+                expected_note: "旧备注",
+            },
+            Case {
+                name: "L6答对",
+                today: TODAY,
+                status: "L6",
+                level: Some(6),
+                correct: true,
+                expected_status: "L7",
+                expected_level: Some(7),
+                expected_due: "2027-05-08",
+                expected_note: "旧备注",
+            },
+            Case {
+                name: "L7答对",
+                today: TODAY,
+                status: "L7",
+                level: Some(7),
+                correct: true,
                 expected_status: "✅已掌握",
                 expected_level: None,
                 expected_due: "",
@@ -559,6 +613,39 @@ mod tests {
                 expected_status: "L1",
                 expected_level: Some(1),
                 expected_due: "2026-11-11",
+                expected_note: "旧备注",
+            },
+            Case {
+                name: "L5答错",
+                today: TODAY,
+                status: "L5",
+                level: Some(5),
+                correct: false,
+                expected_status: "L3",
+                expected_level: Some(3),
+                expected_due: "2026-11-17",
+                expected_note: "旧备注",
+            },
+            Case {
+                name: "L6答错",
+                today: TODAY,
+                status: "L6",
+                level: Some(6),
+                correct: false,
+                expected_status: "L3",
+                expected_level: Some(3),
+                expected_due: "2026-11-17",
+                expected_note: "旧备注",
+            },
+            Case {
+                name: "L7答错",
+                today: TODAY,
+                status: "L7",
+                level: Some(7),
+                correct: false,
+                expected_status: "L3",
+                expected_level: Some(3),
+                expected_due: "2026-11-17",
                 expected_note: "旧备注",
             },
             Case {

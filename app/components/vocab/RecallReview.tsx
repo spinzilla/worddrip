@@ -6,6 +6,8 @@ import { evaluateAnswer, forgotEvaluation, submitRequest, VERDICT_LABEL } from '
 import type { Evaluation, Grade } from '../../utils/vocab/evaluate';
 import { describeChange } from '../../utils/vocab/grading';
 import { statusLabel } from '../../utils/vocab/library';
+import { notifyVocabChanged } from '../../utils/vocab/manualAdd';
+import { useLang } from '../../utils/i18n';
 import { splitScreens, surfaceOf } from '../../utils/vocab/recall';
 import type { RecallQuestion, RecallRound } from '../../utils/vocab/recall';
 import { groupNotes, noteKey, removeNote, upsertNote } from '../../utils/vocab/notes';
@@ -248,6 +250,7 @@ function GradeDetail({ grade, correct, written, answer, reference }: { grade: Gr
  * 点「保存并下一屏」时才把没标出错的题写回复习库。最后一屏之后给逐题结果表，答错的词可以换语境复检。
  */
 export default function RecallReview({ round, prepareError, modelOn, before, makeRecheck, onQuestionConsumed, onExit, variant = 'review', remaining, previewed }: Props) {
+  const lang = useLang();
   const firstTest = variant === 'first';
   const questions = round?.questions ?? [];
   const screens = useMemo(() => splitScreens(questions.map((_, index) => index)), [questions]);
@@ -450,6 +453,8 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
     if (!ready2Commit || committing) return;
     const ok = await commitScreen();
     if (!ok || !aliveRef.current) return;
+    // 复习状态写回后刷新浏览、今日到期和首考面板，避免页面仍显示提交前的等级。
+    notifyVocabChanged();
     if (isLast) { setPhase('done'); return; }
     setScreen(value => value + 1);
     setPhase('write');
@@ -638,8 +643,8 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
               {state.result && (
                 <p className="mt-2 text-sm text-ink" data-testid="recall-saved">
                   {state.result.due
-                    ? <>新到期日：<span className="font-semibold" data-testid="recall-new-due">{state.result.due}</span> · {statusLabel(state.result.status)}</>
-                    : <span className="font-semibold" data-testid="recall-new-due">已掌握</span>}
+                    ? <>{lang === 'zh' ? '新到期日：' : 'Next due: '}<span className="font-semibold" data-testid="recall-new-due">{state.result.due}</span> · {statusLabel(state.result.status, lang)}</>
+                    : <span className="font-semibold" data-testid="recall-new-due">{lang === 'zh' ? '已掌握' : 'Mastered'}</span>}
                   {!state.result.changed && <span className="ml-2 text-mute" data-testid="recall-unchanged">今天已计入，不再升级</span>}
                 </p>
               )}
@@ -873,7 +878,7 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
         verdict: '题目出错（不计分）',
         form: question.answers[0] ?? question.target,
         reason: '你标了「这题出错了」，只记日志，不改状态。',
-        change: `不变：${statusLabel(before[question.wordId]?.status ?? '')}`,
+        change: `${lang === 'zh' ? '不变：' : 'Unchanged: '}${statusLabel(before[question.wordId]?.status ?? '', lang)}`,
         tone: 'text-clay',
       };
     }
@@ -883,7 +888,7 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
       verdict: grade ? verdictText(grade, state.correct, state.written) : state.correct ? '答对' : '答错',
       form: grade?.expected ?? question.answers[0] ?? question.target,
       reason: grade?.reason ?? '',
-      change: state.result ? describeChange(before[question.wordId], state.result) : '',
+        change: state.result ? describeChange(before[question.wordId], state.result, lang) : '',
       tone: state.correct ? 'text-success' : 'text-danger',
     };
   };
@@ -1096,7 +1101,7 @@ export default function RecallReview({ round, prepareError, modelOn, before, mak
             <p className="vocab-quiz-guide">
               {hasTasks && '这一轮有改写、造句题：按要求写一整句，必须用上目标词（近义词不算），由模型判分并给出「语法修正版 → 学术升级版」。'}
               {firstTest
-                ? '看英文释义和语境句，在空格里填出目标词（按句子需要的词形），中文提示只作补充。想不起来就点「忘记了」：按答错计，提交后显示答案。首考答对记为已掌握，答错进入 L1 复习（按现有规则）。题目本身有问题，点「这题出错了」，这题就不计分。'
+                ? '看英文释义和语境句，在空格里填出目标词（按句子需要的词形），中文提示只作补充。想不起来就点「忘记了」：按答错计，提交后显示答案。首考答对进入 L3（8 天后复习），答错进入 L1。题目本身有问题，点「这题出错了」，这题就不计分。'
                 : '看英文释义和语境句，在空格里填出目标词（按句子需要的词形），中文提示只作补充。想不起来就点「忘记了」：按答错计，提交后显示答案。题目本身有问题，点「这题出错了」，这题就不计分。'}
             </p>
             {IS_MOBILE && <p className="vocab-quiz-guide" data-testid="recall-save-note">点「保存」后这一屏才写入复习库，中途退出的这一屏不会保存。</p>}

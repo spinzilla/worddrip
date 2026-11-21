@@ -19,7 +19,7 @@ const def = (pos, english, chinese, examples = []) => ({ sourceFile: 'f.md', sou
 let ord = 0;
 const rw = (word, issue, status, extra = {}) => {
   ord += 1;
-  const level = /^L([1-4])$/.exec(status);
+  const level = /^L([1-7])$/.exec(status);
   return {
     id: `rv:${word}@${issue}#1`, ord, line: ord + 10, raw: `| ${word} |`, word, issue, addedAt: extra.addedAt ?? '2026-10-14', status,
     level: level ? Number(level[1]) : null, due: extra.due ?? '—', note: extra.note ?? '', source: extra.source ?? '',
@@ -162,12 +162,24 @@ assert.deepEqual(L.splitNote('每日加分表达 10-06；加剧（替换 worsen�
 });
 assert.equal(L.statusGroup('🌱待考察'), 'seed');
 assert.equal(L.statusGroup('L3'), 'learning');
-assert.equal(L.statusGroup('L5'), 'other');
+assert.equal(L.statusGroup('L5'), 'warming');
+assert.equal(L.statusGroup('L7'), 'warming');
 assert.equal(L.statusGroup('✅已掌握'), 'mastered');
 assert.equal(L.statusGroup('🧊冷库'), 'cold');
 assert.equal(L.statusText({ status: 'L2', due: '2026-11-11' }), 'L2 · 11-11 到期');
 assert.equal(L.statusText({ status: 'L2', due: '—' }), 'L2');
+assert.equal(L.statusLabel('L5'), '保温 1');
+assert.equal(L.statusLabel('L6', 'en'), 'Long-term 2');
+assert.equal(L.statusLabel('✅已掌握', 'en'), 'Mastered');
+assert.equal(L.statusText({ status: 'L7', due: '2027-05-08' }), '保温 3 · 05-08 到期');
+assert.equal(L.statusText({ status: 'L5', due: '2026-12-24' }, 'en'), 'Long-term 1 · due 12-24');
 assert.equal(L.statusText({ status: '🌱待考察', due: '—' }), '待考察');
+{
+  const longTermLibrary = L.buildLibrary({ reviewWords: [rw('warm', '11.20', 'L5', { due: '2026-12-24' })], upgrades: [], selfChecks: [] });
+  assert.deepEqual(ids(L.searchLibrary(longTermLibrary, '', { status: 'warming' })), ['w:warm']);
+  assert.deepEqual(ids(L.searchLibrary(longTermLibrary, '', { status: 'learning' })), ['w:warm'], '复习中筛选也包含保温级');
+  assert.equal(L.groupByIssue(longTermLibrary, '')[0].counts.warming, 1);
+}
 
 // ---- 按期回看 ----
 {

@@ -89,11 +89,12 @@ export function snippet(text: string, query: string, radius = 28): string {
 
 // ---------- 学习状态 ----------
 
-export type StatusGroup = 'seed' | 'learning' | 'mastered' | 'cold' | 'other';
+export type StatusGroup = 'seed' | 'learning' | 'warming' | 'mastered' | 'cold' | 'other';
 
 export const STATUS_GROUPS: { key: StatusGroup; label: string }[] = [
   { key: 'seed', label: '待考察' },
-  { key: 'learning', label: '复习中 L1–L4' },
+  { key: 'learning', label: '复习中' },
+  { key: 'warming', label: '保温中' },
   { key: 'mastered', label: '已掌握' },
   { key: 'cold', label: '冷库' },
 ];
@@ -102,32 +103,46 @@ export const STATUS_GROUPS: { key: StatusGroup; label: string }[] = [
 export function statusGroup(status: string): StatusGroup {
   const s = status.trim();
   if (/^L[1-4]$/.test(s)) return 'learning';
+  if (/^L[5-7]$/.test(s)) return 'warming';
   if (s.includes('✅') || s.includes('已掌握')) return 'mastered';
   if (s.includes('🧊') || s.includes('冷库')) return 'cold';
   if (s.includes('🌱') || s.includes('待考察')) return 'seed';
   return 'other';
 }
 
+function matchesStatusFilter(status: string, filter: StatusGroup | 'all'): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'learning') return ['learning', 'warming'].includes(statusGroup(status));
+  return statusGroup(status) === filter;
+}
+
 /**
  * 042：界面上显示状态用的文字（不带 🌱 / ✅ / 🧊）。数据库和导出里仍是原值，只在显示层换。
  * 例如「🌱待考察」→「待考察」、「✅已掌握」→「已掌握」、「L2」→「L2」。
  */
-export function statusLabel(status: string): string {
+export function statusLabel(status: string, lang: 'zh' | 'en' = 'zh'): string {
+  const level = /^L([5-7])$/.exec(status.trim());
+  if (level) return lang === 'zh' ? `保温 ${Number(level[1]) - 4}` : `Long-term ${Number(level[1]) - 4}`;
   const group = statusGroup(status);
-  if (group === 'seed') return '待考察';
-  if (group === 'mastered') return '已掌握';
-  if (group === 'cold') return '冷库';
+  if (group === 'seed') return lang === 'zh' ? '待考察' : 'Not tested';
+  if (group === 'mastered') return lang === 'zh' ? '已掌握' : 'Mastered';
+  if (group === 'cold') return lang === 'zh' ? '冷库' : 'Cold storage';
   return status.trim();
 }
 
 /** 状态的简短中文说明，例如「L2 · 11-11 到期」「已掌握」。 */
-export function statusText(entry: Pick<BrowseReviewWord, 'status' | 'due'>): string {
+export function statusText(entry: Pick<BrowseReviewWord, 'status' | 'due'>, lang: 'zh' | 'en' = 'zh'): string {
   const group = statusGroup(entry.status);
   const due = /^\d{4}-(\d{2})-(\d{2})$/.exec(entry.due.trim());
-  if (group === 'learning') return due ? `${entry.status.trim()} · ${due[1]}-${due[2]} 到期` : entry.status.trim();
-  if (group === 'seed') return '待考察';
-  if (group === 'mastered') return '已掌握';
-  if (group === 'cold') return '冷库';
+  if (group === 'learning' || group === 'warming') {
+    const label = statusLabel(entry.status, lang);
+    if (!due) return label;
+    const date = `${due[1]}-${due[2]}`;
+    return lang === 'zh' ? `${label} · ${date} 到期` : `${label} · due ${date}`;
+  }
+  if (group === 'seed') return lang === 'zh' ? '待考察' : 'Not tested';
+  if (group === 'mastered') return lang === 'zh' ? '已掌握' : 'Mastered';
+  if (group === 'cold') return lang === 'zh' ? '冷库' : 'Cold storage';
   return entry.status.trim() || '无状态';
 }
 
@@ -448,7 +463,7 @@ function wordPasses(group: WordGroup, options: SearchOptions, library: Pick<Libr
   const verification = options.verification ?? '全部';
   if (options.notes === 'has' && !hasNotes(library, group.word)) return false;
   return group.entries.some(entry =>
-    (status === 'all' || statusGroup(entry.status) === status) &&
+    matchesStatusFilter(entry.status, status) &&
     (verification === '全部' || entry.verificationStatus === verification),
   );
 }
@@ -473,11 +488,11 @@ function addedOf(hit: Hit): string {
   return hit.word.entries.reduce((max, entry) => (entry.addedAt > max ? entry.addedAt : max), '');
 }
 
-/** 最早的到期日（只看 L1–L4 且日期合法的记录），没有就返回空。 */
+/** 最早的到期日（只看 L1–L7 且日期合法的记录），没有就返回空。 */
 function dueOf(hit: Hit): string {
   if (hit.kind !== 'word') return '';
   const dues = hit.word.entries
-    .filter(entry => statusGroup(entry.status) === 'learning' && /^\d{4}-\d{2}-\d{2}$/.test(entry.due.trim()))
+    .filter(entry => ['learning', 'warming'].includes(statusGroup(entry.status)) && /^\d{4}-\d{2}-\d{2}$/.test(entry.due.trim()))
     .map(entry => entry.due.trim())
     .sort();
   return dues[0] ?? '';
@@ -593,12 +608,12 @@ export function groupByIssue(library: Library, query: string, options: SearchOpt
     if (q && scoreWord(group, q, query.trim(), notesForWord(library, group.word)).score === 0) continue;
     for (const entry of group.entries) {
       const status = options.status ?? 'all';
-      if (status !== 'all' && statusGroup(entry.status) !== status) continue;
+      if (!matchesStatusFilter(entry.status, status)) continue;
       if ((options.verification ?? '全部') !== '全部' && entry.verificationStatus !== options.verification) continue;
       const issue = entry.issue.trim() || '（无期号）';
       let bucket = map.get(issue);
       if (!bucket) {
-        bucket = { issue, words: [], counts: { seed: 0, learning: 0, mastered: 0, cold: 0, other: 0 } };
+        bucket = { issue, words: [], counts: { seed: 0, learning: 0, warming: 0, mastered: 0, cold: 0, other: 0 } };
         map.set(issue, bucket);
       }
       bucket.words.push({ group, entry });

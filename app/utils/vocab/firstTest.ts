@@ -6,7 +6,7 @@ import type { BrowseReviewWord } from './types';
  *
  * 纯函数，不碰数据库。只负责「选哪一期、每批取几个、还剩几个」；
  * 出题、判分、笔误申诉、题目出错、同日复检全部复用 030 / 031，不在这里另做一套。
- * 状态怎么变仍由 022 的 vocab_review_submit 决定：首考答对 → ✅已掌握，答错 → L1（两天后到期）。
+ * 状态怎么变仍由 vocab_review_submit 决定：首考答对 → L3（8 天后到期），答错 → L1（两天后到期）。
  */
 
 /** 每批最多几个新词。规范要求新词固定 7 题。 */
@@ -22,7 +22,7 @@ const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 const issueOf = (word: Pick<BrowseReviewWord, 'issue'>) => word.issue.trim() || NO_ISSUE;
 
-/** 是否还没首考的新词（只认 🌱/待考察，不认 L1–L4）。 */
+/** 是否还没首考的新词（只认 🌱/待考察，不认任何 L1–L7）。 */
 export function isSeedWord(word: Pick<BrowseReviewWord, 'status'>): boolean {
   return statusGroup(word.status) === 'seed';
 }

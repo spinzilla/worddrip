@@ -139,7 +139,7 @@ fn prepare_incoming(db_path: &Path, bytes: &[u8]) -> Result<(PathBuf, LibrarySum
     let summary = LibrarySummary {
       words: count("SELECT COUNT(*) FROM review_word WHERE deleted = 0")?,
       due: conn.query_row("SELECT COUNT(*) FROM review_word
-        WHERE deleted = 0 AND level BETWEEN 1 AND 4 AND status = 'L' || level AND due <> '' AND due <= ?1",
+        WHERE deleted = 0 AND level BETWEEN 1 AND 7 AND status = 'L' || level AND due <> '' AND due <= ?1",
         [today], |row| row.get(0)).map_err(|e| format!("读取到期数失败：{e}"))?,
       notes: count("SELECT COUNT(*) FROM vocab_note")?,
       quick_notes: count("SELECT COUNT(*) FROM quick_note")?,

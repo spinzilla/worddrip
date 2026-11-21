@@ -31,7 +31,7 @@ const definition = (english, sentence) => ({
 });
 const word = (id, text, issue, status = '🌱待考察', ord = 1, definitions = [definition(`meaning of ${text}`, `This sentence uses ${text} exactly once.`)]) => ({
   id, ord, line: ord + 4, raw: `| ${text} | ${issue} |`, word: text, issue,
-  addedAt: '2026-10-01', status, level: /^L([1-4])$/.exec(status) ? Number(/^L([1-4])$/.exec(status)[1]) : null,
+  addedAt: '2026-10-01', status, level: /^L([1-7])$/.exec(status) ? Number(/^L([1-7])$/.exec(status)[1]) : null,
   due: '', note: '', source: '测试', verificationStatus: '未查证', definitions,
 });
 const ids = list => list.map(item => item.id);

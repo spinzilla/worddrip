@@ -66,7 +66,7 @@
 .vocab-pill { display: inline-flex; align-items: center; gap: 0.35rem; max-width: 100%; border: 1px solid var(--line); border-radius: 9999px; background: var(--page); padding: 0.15rem 0.7rem; font-size: 0.875rem; color: var(--ink); }
 .vocab-pill-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .vocab-pill-tag { border-radius: 9999px; background: var(--clay-soft); padding: 0 0.4rem; font-size: 0.6875rem; line-height: 1.1rem; color: var(--clay); font-weight: 500; white-space: nowrap; }
-/* 学习进度：L1–L5 五个点。 */
+/* 学习进度：L1–L7 七个点。 */
 .vocab-dot { width: 0.6rem; height: 0.6rem; border-radius: 9999px; background: var(--shade); border: 1px solid var(--line); }
 .vocab-dot[data-on="true"] { background: var(--accent); border-color: var(--accent); }
 .vocab-bullets { list-style: disc; padding-left: 1.2rem; font-size: 0.875rem; color: var(--ink); }

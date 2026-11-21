@@ -16,6 +16,7 @@ import type { Hit, NoteFilter, SortMode, StatusGroup, UpgradeGroup } from '../..
 import { groupNotes, onNotesChanged, removeNote, upsertNote } from '../../utils/vocab/notes';
 import { onVocabChanged } from '../../utils/vocab/manualAdd';
 import { VERIFICATION_STATUSES } from '../../utils/vocab/types';
+import { useLang } from '../../utils/i18n';
 import type { BrowseData, BrowseSelfCheck, ReviewMetadataResult, VerificationStatus, VocabNote } from '../../utils/vocab/types';
 import type { NoteHandlers } from './NotesSection';
 import EntryDetail, { Hl, StatusChip } from './EntryDetail';
@@ -34,6 +35,11 @@ const VIEWS: { key: View; label: string; hint: string }[] = [
 ];
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
+
+function statusGroupLabel(key: StatusGroup, lang: 'en' | 'zh'): string {
+  if (lang === 'zh') return STATUS_GROUPS.find(group => group.key === key)?.label ?? key;
+  return ({ seed: 'Not tested', learning: 'In review', warming: 'Long-term review', mastered: 'Mastered', cold: 'Cold storage', other: 'Other' } as const)[key];
+}
 
 interface Props {
   /** 页面当前是否显示；从隐藏变为显示时重新读取，导入后能看到新数据。 */
@@ -121,6 +127,7 @@ function SelfCheckRow({ item, query, selected, onSelect }: { item: BrowseSelfChe
 }
 
 export default function BrowsePanel({ active, onGoImport, hideImport }: Props) {
+  const lang = useLang();
   const gateRef = useRef(createLatestGate());
   const detailRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<BrowseData>(emptyBrowse());
@@ -333,7 +340,7 @@ export default function BrowsePanel({ active, onGoImport, hideImport }: Props) {
             <span>学习状态</span>
             <select value={status} onChange={event => setStatus(event.target.value as StatusGroup | 'all')} data-testid="status-filter">
               <option value="all">全部</option>
-              {STATUS_GROUPS.map(group => <option key={group.key} value={group.key}>{group.label}</option>)}
+              {STATUS_GROUPS.map(group => <option key={group.key} value={group.key}>{statusGroupLabel(group.key, lang)}</option>)}
             </select>
           </label>
           {view === 'search' && (
@@ -391,7 +398,7 @@ export default function BrowsePanel({ active, onGoImport, hideImport }: Props) {
                     <span className="text-base font-semibold text-ink">{issue.issue}{/^\d/.test(issue.issue) ? ' 期' : ''}</span>
                     <span className="text-xs text-mute">{issue.words.length} 词</span>
                     <span className="vocab-issue-counts text-[11px] text-mute">
-                      {STATUS_GROUPS.filter(g => issue.counts[g.key] > 0).map(g => `${g.label.replace(' L1–L4', '')} ${issue.counts[g.key]}`).join(' · ')}
+              {STATUS_GROUPS.filter(g => issue.counts[g.key] > 0).map(g => `${statusGroupLabel(g.key, lang)} ${issue.counts[g.key]}`).join(' · ')}
                     </span>
                   </summary>
                   <div className="vocab-issue-words">

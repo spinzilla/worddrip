@@ -14,6 +14,7 @@ type DefinitionsEnData = ReturnType<typeof useMyDefinitions>;
 import { definitionKey } from '../../utils/vocab/definitionEn';
 import VoiceButton from './VoiceButton';
 import { registerNoteSource } from '../../utils/quicknote/context';
+import { useLang } from '../../utils/i18n';
 import { useAiContextWord } from '../ai/panelState';
 import { exampleKey, sensesFrom } from '../../utils/vocab/examples';
 import type { VocabExample } from '../../utils/vocab/types';
@@ -52,15 +53,17 @@ const STATUS_CLASS: Record<string, string> = {
   // 只用上游的浅色色板：复习中用唯一的强调色，其余用灰阶区分。
   seed: 'border-line bg-shade text-mute',
   learning: 'border-accent/30 bg-accent-soft text-accent',
+  warming: 'border-accent/30 bg-accent-soft text-accent',
   mastered: 'border-ink/20 bg-page text-ink',
   cold: 'border-line bg-page text-faint',
   other: 'border-line bg-page text-mute',
 };
 
 export function StatusChip({ status, due }: { status: string; due: string }) {
+  const lang = useLang();
   return (
     <span className={`vocab-chip ${STATUS_CLASS[statusGroup(status)]}`} data-testid="status-chip">
-      {statusText({ status, due })}
+      {statusText({ status, due }, lang)}
     </span>
   );
 }
@@ -112,9 +115,9 @@ function daysUntil(due: string): number | null {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
-/** 学习进度：L1–L5 五个点 + 到期提示（逾期用警示色）。 */
+/** 学习进度：L1–L7 七个点 + 到期提示（逾期用警示色）。 */
 function ProgressMeter({ status, due }: { status: string; due: string }) {
-  const level = /^L([1-5])$/.exec(status.trim());
+  const level = /^L([1-7])$/.exec(status.trim());
   const days = daysUntil(due);
   let dueNode: React.ReactNode = null;
   if (days !== null) {
@@ -127,8 +130,8 @@ function ProgressMeter({ status, due }: { status: string; due: string }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
       {level && (
-        <span className="inline-flex items-center gap-1" role="img" aria-label={`第 ${level[1]} 级，共 5 级`} data-testid="level-dots">
-          {[1, 2, 3, 4, 5].map(n => <span key={n} className="vocab-dot" data-on={n <= Number(level[1])} />)}
+          <span className="inline-flex items-center gap-1" role="img" aria-label={`第 ${level[1]} 级，共 7 级`} data-testid="level-dots">
+          {[1, 2, 3, 4, 5, 6, 7].map(n => <span key={n} className="vocab-dot" data-on={n <= Number(level[1])} />)}
         </span>
       )}
       {dueNode}
@@ -265,6 +268,7 @@ function WordDetail({ group, library, query, onOpen, onSaved, noteHandlers, exam
   examples: ExamplesData;
   definitionsEn: DefinitionsEnData;
 }) {
+  const lang = useLang();
   const myExamples = examples.byKey.get(exampleKey(group.word)) ?? [];
   const myDefinitions = definitionsEn.byKey.get(definitionKey(group.word)) ?? [];
   const myNotes = notesForWord(library, group.word);
@@ -381,6 +385,13 @@ function WordDetail({ group, library, query, onOpen, onSaved, noteHandlers, exam
                 <StatusChip status={entry.status} due={entry.due} />
                 <span className="text-xs text-mute">入库 {entry.addedAt || '—'}</span>
               </div>
+              {/^L[5-7]$/.test(entry.status.trim()) && (
+                <p className="mt-1 text-xs text-mute" data-testid="warming-hint">
+                  {lang === 'zh'
+                    ? '已过 L4，隔 45/90/180 天再各考一次，都对才算掌握'
+                    : 'Past L4: review again after 45, 90 and 180 days; all three must be correct to count as mastered.'}
+                </p>
+              )}
               <ProgressMeter status={entry.status} due={entry.due} />
               {parts.history.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-xs text-mute">

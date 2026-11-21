@@ -33,7 +33,7 @@ console.log(`升级库 ${upgrade.entries.length} 条`);
 console.log(`自查 ${upgrade.selfChecks.length} 条`);
 console.log(`复习库 ${review.words.length} 行`);
 console.log(`不同单词（规范化后）${uniqueWords.size} 个`);
-console.log(`L1–L4 合计 ${review.words.filter(word => word.level !== null).length} 行`);
+console.log(`L1–L7 合计 ${review.words.filter(word => word.level !== null).length} 行`);
 console.log(`duplicate 警告 ${review.warnings.filter(warning => warning.kind === 'duplicate').length} 条，覆盖 ${duplicateWords.length} 组词：${duplicateWords.join('、')}`);
 console.log(`所有 ID 互不重复：${allIdsUnique ? '是' : '否'}（共 ${ids.length} 个）`);
 console.log(`升级库警告 ${upgrade.warnings.length} 条；复习库警告 ${review.warnings.length} 条`);

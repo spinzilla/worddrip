@@ -402,8 +402,16 @@ function runTransfer(command, args, { allowFail = false, capture = false, timeou
   return { ok, stdout: result.stdout || '' };
 }
 
-function remote(command, options) {
-  return runTransfer('ssh', ['-o', 'ConnectTimeout=15', 'tencent', command], options);
+// 服务器偶尔直接断开 ssh（Connection closed，退出码 255，0.11.5 发版时拼块、对 sha 各断过一次），
+// 所以远程命令也要重试。这里的命令都能安全重跑（mkdir -p、cat 覆盖写、sha256sum、rm -rf）。
+function remote(command, { allowFail = false, ...options } = {}) {
+  for (let attempt = 1; attempt <= transferRetries; attempt += 1) {
+    const result = runTransfer('ssh', ['-o', 'ConnectTimeout=15', 'tencent', command], { ...options, allowFail: true });
+    if (result.ok) return result;
+    if (attempt < transferRetries) console.log(`  远程命令第 ${attempt} 次没成功，重试`);
+  }
+  if (!allowFail) fail(`ssh 失败（重试 ${transferRetries} 次）：${command.slice(0, 80)}`);
+  return { ok: false, stdout: '' };
 }
 
 function scpWithRetry(localFile, remotePath) {

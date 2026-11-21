@@ -9,7 +9,7 @@ export function notifyVocabDueCount(count: number) {
   window.dispatchEvent(new CustomEvent<number>(VOCAB_DUE_EVENT, { detail: count }));
 }
 
-/** 导航和复习入口共用同一个到期口径：L1–L4 且今天已到期。 */
+/** 导航和复习入口共用同一个到期口径：L1–L7 且今天已到期。 */
 export default function useVocabDueCount() {
   const [count, setCount] = useState(0);
   const load = useCallback(() => {

@@ -151,7 +151,7 @@ export function parseReviewLibrary(md: string): ReviewParseResult {
       warnings.push({ line, kind: 'duplicate', message: `单词“${word}”与第 ${firstLine} 行重复，仍保留本行` });
     }
 
-    const levelMatch = /^L([1-4])$/.exec(status);
+    const levelMatch = /^L([1-7])$/.exec(status);
     if (levelMatch === null && !['🌱待考察', '✅已掌握', '🧊冷库'].includes(status)) {
       warnings.push({ line, kind: 'status', message: `未知状态“${status}”，已保留原值` });
     }
@@ -164,7 +164,7 @@ export function parseReviewLibrary(md: string): ReviewParseResult {
       issue,
       addedAt,
       status,
-      level: levelMatch === null ? null : Number(levelMatch[1]) as 1 | 2 | 3 | 4,
+      level: levelMatch === null ? null : Number(levelMatch[1]) as 1 | 2 | 3 | 4 | 5 | 6 | 7,
       due: due === '—' ? '' : due,
       note,
     };
